@@ -1,0 +1,1 @@
+trial_id,timestamp,branch,commit_sha,change_summary,avg_speedup,min_speedup,max_speedup,avg_latency_ms,workloads_passed,workloads_total,bottleneck,sm_throughput_pct,dram_throughput_pct,l1_lsu_pct,tensor_core_pct,merged_to_main
