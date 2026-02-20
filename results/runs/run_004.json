@@ -1,0 +1,195 @@
+{
+  "run_id": "004",
+  "variant": "v003_fp16_gemm",
+  "strategy": "P1",
+  "kernel_sha256": "a9b43c5d0cc800c3",
+  "bench_config": {
+    "warmup_runs": 2,
+    "iterations": 30,
+    "num_trials": 3
+  },
+  "git_branch": "opt/v003-fp16-gemm",
+  "git_commit": "2da1e5b",
+  "summary": {
+    "num_passed": 0,
+    "num_failed": 19,
+    "avg_speedup": 0.0,
+    "min_speedup": 0.0,
+    "max_speedup": 0.0,
+    "geomean_speedup": 0.0
+  },
+  "workloads": [
+    {
+      "uuid": "b8f4f012",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "e05c6c03",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "6230e838",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "8f1ff9f1",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "1a4c6ba1",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "a7c2bcfd",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "2e69caee",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "8cba5890",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "5e8dc11c",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "58a34f27",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "5eadab1e",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "eedc63b2",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "e626d3e6",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "74d7ff04",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "4822167c",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "81955b1e",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "76010cb4",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "fc378037",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    },
+    {
+      "uuid": "f7d6ac7c",
+      "status": "INCORRECT_NUMERICAL",
+      "speedup": null,
+      "latency_ms": null,
+      "ref_latency_ms": null,
+      "max_abs_error": Infinity,
+      "max_rel_error": Infinity
+    }
+  ],
+  "timestamp": "2026-02-20T09:54:37.058799+00:00"
+}

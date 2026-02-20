@@ -1,0 +1,195 @@
+{
+  "run_id": "001",
+  "variant": "baseline",
+  "strategy": "baseline",
+  "kernel_sha256": "b44f3620698189f1",
+  "bench_config": {
+    "warmup_runs": 3,
+    "iterations": 100,
+    "num_trials": 5
+  },
+  "git_branch": "main",
+  "git_commit": "da03797",
+  "summary": {
+    "num_passed": 19,
+    "num_failed": 0,
+    "avg_speedup": 2.25,
+    "min_speedup": 1.16,
+    "max_speedup": 5.17,
+    "geomean_speedup": 2.07
+  },
+  "workloads": [
+    {
+      "uuid": "b8f4f012",
+      "status": "PASSED",
+      "speedup": 3.79,
+      "latency_ms": 3.087,
+      "ref_latency_ms": null,
+      "max_abs_error": 256.0,
+      "max_rel_error": 0.00758
+    },
+    {
+      "uuid": "e05c6c03",
+      "status": "PASSED",
+      "speedup": 5.17,
+      "latency_ms": 2.145,
+      "ref_latency_ms": null,
+      "max_abs_error": 0.0,
+      "max_rel_error": 0.0
+    },
+    {
+      "uuid": "6230e838",
+      "status": "PASSED",
+      "speedup": 1.99,
+      "latency_ms": 6.981,
+      "ref_latency_ms": null,
+      "max_abs_error": 4.0,
+      "max_rel_error": 0.00515
+    },
+    {
+      "uuid": "8f1ff9f1",
+      "status": "PASSED",
+      "speedup": 1.61,
+      "latency_ms": 9.764,
+      "ref_latency_ms": null,
+      "max_abs_error": 16.0,
+      "max_rel_error": 0.0133
+    },
+    {
+      "uuid": "1a4c6ba1",
+      "status": "PASSED",
+      "speedup": 1.36,
+      "latency_ms": 15.465,
+      "ref_latency_ms": null,
+      "max_abs_error": 512.0,
+      "max_rel_error": 0.25
+    },
+    {
+      "uuid": "a7c2bcfd",
+      "status": "PASSED",
+      "speedup": 2.63,
+      "latency_ms": 4.776,
+      "ref_latency_ms": null,
+      "max_abs_error": 8.0,
+      "max_rel_error": 0.00568
+    },
+    {
+      "uuid": "2e69caee",
+      "status": "PASSED",
+      "speedup": 3.97,
+      "latency_ms": 2.89,
+      "ref_latency_ms": null,
+      "max_abs_error": 0.25,
+      "max_rel_error": 0.00478
+    },
+    {
+      "uuid": "8cba5890",
+      "status": "PASSED",
+      "speedup": 2.77,
+      "latency_ms": 4.453,
+      "ref_latency_ms": null,
+      "max_abs_error": 0.25,
+      "max_rel_error": 0.00633
+    },
+    {
+      "uuid": "5e8dc11c",
+      "status": "PASSED",
+      "speedup": 1.16,
+      "latency_ms": 38.985,
+      "ref_latency_ms": null,
+      "max_abs_error": 2050.0,
+      "max_rel_error": 0.463
+    },
+    {
+      "uuid": "58a34f27",
+      "status": "PASSED",
+      "speedup": 1.2,
+      "latency_ms": 29.793,
+      "ref_latency_ms": null,
+      "max_abs_error": 1020.0,
+      "max_rel_error": 0.25
+    },
+    {
+      "uuid": "5eadab1e",
+      "status": "PASSED",
+      "speedup": 2.09,
+      "latency_ms": 6.55,
+      "ref_latency_ms": null,
+      "max_abs_error": 64.0,
+      "max_rel_error": 0.00741
+    },
+    {
+      "uuid": "eedc63b2",
+      "status": "PASSED",
+      "speedup": 2.08,
+      "latency_ms": 6.502,
+      "ref_latency_ms": null,
+      "max_abs_error": 64.0,
+      "max_rel_error": 0.00649
+    },
+    {
+      "uuid": "e626d3e6",
+      "status": "PASSED",
+      "speedup": 1.68,
+      "latency_ms": 9.064,
+      "ref_latency_ms": null,
+      "max_abs_error": 512.0,
+      "max_rel_error": 0.00758
+    },
+    {
+      "uuid": "74d7ff04",
+      "status": "PASSED",
+      "speedup": 1.75,
+      "latency_ms": 8.442,
+      "ref_latency_ms": null,
+      "max_abs_error": 32.0,
+      "max_rel_error": 0.00667
+    },
+    {
+      "uuid": "4822167c",
+      "status": "PASSED",
+      "speedup": 1.73,
+      "latency_ms": 8.609,
+      "ref_latency_ms": null,
+      "max_abs_error": 512.0,
+      "max_rel_error": 0.00645
+    },
+    {
+      "uuid": "81955b1e",
+      "status": "PASSED",
+      "speedup": 1.8,
+      "latency_ms": 8.036,
+      "ref_latency_ms": null,
+      "max_abs_error": 64.0,
+      "max_rel_error": 0.00658
+    },
+    {
+      "uuid": "76010cb4",
+      "status": "PASSED",
+      "speedup": 1.86,
+      "latency_ms": 7.61,
+      "ref_latency_ms": null,
+      "max_abs_error": 8.0,
+      "max_rel_error": 0.00505
+    },
+    {
+      "uuid": "fc378037",
+      "status": "PASSED",
+      "speedup": 1.8,
+      "latency_ms": 8.05,
+      "ref_latency_ms": null,
+      "max_abs_error": 128.0,
+      "max_rel_error": 0.00758
+    },
+    {
+      "uuid": "f7d6ac7c",
+      "status": "PASSED",
+      "speedup": 2.23,
+      "latency_ms": 5.917,
+      "ref_latency_ms": null,
+      "max_abs_error": 512.0,
+      "max_rel_error": 0.00595
+    }
+  ],
+  "timestamp": "2026-02-20T09:03:42.937669+00:00"
+}

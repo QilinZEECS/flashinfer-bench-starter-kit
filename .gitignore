@@ -1,6 +1,5 @@
 # FlashInfer Competition
 solution.json
-results/
 
 # Kernel backup (runner safety)
 solution/triton/kernel.py.bak
