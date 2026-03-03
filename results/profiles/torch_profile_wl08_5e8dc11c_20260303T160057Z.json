@@ -1,0 +1,245 @@
+{
+  "active_steps": 3,
+  "cuda_available": true,
+  "cuda_device_name": "NVIDIA B200",
+  "definition": "moe_fp8_block_scale_ds_routing_topk8_ng8_kg4_e32_h7168_i2048",
+  "num_workloads": 19,
+  "profile_table": "-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \n                                                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg       CPU Mem  Self CPU Mem      CUDA Mem  Self CUDA Mem    # of Calls  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \n                                               aten::mm         6.59%       8.211ms         7.60%       9.468ms      49.315us      88.031ms        81.75%      88.031ms     458.493us           0 B           0 B       2.04 GB       2.04 GB           192  \ncutlass3x_sm100_simt_sgemm_f32_f32_f32_f32_f32_64x64...         0.00%       0.000us         0.00%       0.000us       0.000us      24.627ms        22.87%      24.627ms     684.072us           0 B           0 B           0 B           0 B            36  \ncutlass3x_sm100_simt_sgemm_f32_f32_f32_f32_f32_128x1...         0.00%       0.000us         0.00%       0.000us       0.000us      23.439ms        21.77%      23.439ms     558.077us           0 B           0 B           0 B           0 B            42  \ncutlass3x_sm100_simt_sgemm_f32_f32_f32_f32_f32_128x6...         0.00%       0.000us         0.00%       0.000us       0.000us      22.159ms        20.58%      22.159ms     388.760us           0 B           0 B           0 B           0 B            57  \ncutlass3x_sm100_simt_sgemm_f32_f32_f32_f32_f32_64x32...         0.00%       0.000us         0.00%       0.000us       0.000us      13.558ms        12.59%      13.558ms     301.298us           0 B           0 B           0 B           0 B            45  \n                                 _dequant_weight_kernel         0.00%       0.000us         0.00%       0.000us       0.000us       9.878ms         9.17%       9.878ms      51.446us           0 B           0 B           0 B           0 B           192  \ncutlass3x_sm100_simt_sgemm_f32_f32_f32_f32_f32_64x12...         0.00%       0.000us         0.00%       0.000us       0.000us       3.691ms         3.43%       3.691ms     410.081us           0 B           0 B           0 B           0 B             9  \n                                       cuLaunchKernelEx         2.57%       3.209ms         2.57%       3.209ms       6.644us       2.724ms         2.53%       2.724ms       5.641us           0 B           0 B           0 B           0 B           483  \n                                       aten::index_add_         0.47%     581.632us         0.89%       1.107ms      11.532us       1.965ms         1.82%       1.965ms      20.471us           0 B           0 B           0 B           0 B            96  \nvoid at::native::indexFuncLargeIndex<float, long, un...         0.00%       0.000us         0.00%       0.000us       0.000us       1.965ms         1.82%       1.965ms      20.471us           0 B           0 B           0 B           0 B            96  \n                                             aten::topk         0.09%     115.817us         0.15%     184.599us      20.511us       1.257ms         1.17%       1.257ms     139.623us           0 B           0 B      13.56 MB      13.56 MB             9  \nvoid at::native::sbtopk::gatherTopK<float, unsigned ...         0.00%       0.000us         0.00%       0.000us       0.000us       1.257ms         1.17%       1.257ms     139.623us           0 B           0 B           0 B           0 B             9  \n                                          aten::nonzero         1.98%       2.468ms         6.63%       8.258ms      86.026us       1.080ms         1.00%       1.080ms      11.250us           0 B           0 B     402.00 KB           0 B            96  \n                                              aten::mul         0.63%     784.151us         1.21%       1.507ms      14.779us       1.008ms         0.94%       1.008ms       9.886us           0 B           0 B       1.37 GB       1.37 GB           102  \nvoid at::native::elementwise_kernel<128, 2, at::nati...         0.00%       0.000us         0.00%       0.000us       0.000us     978.841us         0.91%     978.841us      10.196us           0 B           0 B           0 B           0 B            96  \n                                         _swiglu_kernel         0.00%       0.000us         0.00%       0.000us       0.000us     870.421us         0.81%     870.421us       9.067us           0 B           0 B           0 B           0 B            96  \n                                           aten::gather         2.08%       2.594ms         3.37%       4.201ms      21.878us     856.129us         0.80%     856.129us       4.459us           0 B           0 B           0 B           0 B           192  \nvoid at::native::vectorized_gather_kernel<16, long>(...         0.00%       0.000us         0.00%       0.000us       0.000us     856.129us         0.80%     856.129us       4.459us           0 B           0 B           0 B           0 B           192  \n                                              aten::any         1.16%       1.441ms         2.11%       2.627ms      13.684us     669.696us         0.62%     669.696us       3.488us           0 B           0 B       1.36 MB       1.36 MB           192  \nvoid at::native::reduce_kernel<512, 1, at::native::R...         0.00%       0.000us         0.00%       0.000us       0.000us     669.696us         0.62%     669.696us       3.488us           0 B           0 B           0 B           0 B           192  \n                         Memcpy DtoH (Device -> Pinned)         0.00%       0.000us         0.00%       0.000us       0.000us     655.513us         0.61%     655.513us       3.414us           0 B           0 B           0 B           0 B           192  \n                          _dequant_hidden_states_kernel         0.00%       0.000us         0.00%       0.000us       0.000us     624.478us         0.58%     624.478us     208.159us           0 B           0 B           0 B           0 B             3  \ncutlass3x_sm100_simt_sgemm_f32_f32_f32_f32_f32_32x32...         0.00%       0.000us         0.00%       0.000us       0.000us     556.382us         0.52%     556.382us     185.461us           0 B           0 B           0 B           0 B             3  \n                                            aten::copy_         0.09%     117.688us         0.26%     318.644us      21.243us     524.124us         0.49%     524.124us      34.942us           0 B           0 B           0 B           0 B            15  \n                              aten::_local_scalar_dense         0.36%     443.833us        60.35%      75.220ms     783.544us     350.269us         0.33%     350.269us       3.649us           0 B           0 B           0 B           0 B            96  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \nSelf CPU time total: 124.645ms\nSelf CUDA time total: 107.684ms\n",
+  "solution_name": "my-team-solution-v1",
+  "top_ops": [
+    {
+      "calls": 498,
+      "cpu_total_us": 1361.0310000000236,
+      "cuda_total_us": 0.0,
+      "name": "aten::empty",
+      "self_cpu_us": 1361.0310000000236,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 1,
+      "cpu_total_us": 2148.0029999999997,
+      "cuda_total_us": 0.0,
+      "name": "Activity Buffer Request",
+      "self_cpu_us": 2148.0029999999997,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 483,
+      "cpu_total_us": 3208.856999999939,
+      "cuda_total_us": 0.0,
+      "name": "cuLaunchKernelEx",
+      "self_cpu_us": 3208.856999999939,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "_dequant_hidden_states_kernel",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 235.41700000000856,
+      "cuda_total_us": 0.0,
+      "name": "aten::to",
+      "self_cpu_us": 20.12200000003213,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 215.29499999997643,
+      "cuda_total_us": 0.0,
+      "name": "aten::_to_copy",
+      "self_cpu_us": 39.925999999964006,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 42.19000000000506,
+      "cuda_total_us": 0.0,
+      "name": "aten::empty_strided",
+      "self_cpu_us": 42.19000000000506,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 15,
+      "cpu_total_us": 318.6439999999834,
+      "cuda_total_us": 0.0,
+      "name": "aten::copy_",
+      "self_cpu_us": 117.68799999998737,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 1119,
+      "cpu_total_us": 7137.976999999717,
+      "cuda_total_us": 0.0,
+      "name": "cudaLaunchKernel",
+      "self_cpu_us": 7137.976999999717,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 144.66599999999016,
+      "cuda_total_us": 0.0,
+      "name": "aten::reshape",
+      "self_cpu_us": 37.54599999998527,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 198,
+      "cpu_total_us": 211.56499999996686,
+      "cuda_total_us": 0.0,
+      "name": "aten::view",
+      "self_cpu_us": 211.56499999996686,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 70.44499999999334,
+      "cuda_total_us": 0.0,
+      "name": "aten::sigmoid",
+      "self_cpu_us": 41.30599999998822,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#7}::operator()() const::{lambda(float)#1}, std::array<char*, 2ul>, 4, TrivialOffsetCalculator<1, unsigned int>, TrivialOffsetCalculator<1, unsigned int>, at::native::memory::LoadWithCast<1>, at::native::memory::StoreWithCast<1> >(int, at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#7}::operator()() const::{lambda(float)#1}, std::array<char*, 2ul>, TrivialOffsetCalculator<1, unsigned int>, TrivialOffsetCalculator<1, unsigned int>, at::native::memory::LoadWithCast<1>, at::native::memory::StoreWithCast<1>)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::sigmoid_kernel_cuda(at::TensorIteratorBase&)::{lambda()#2}::operator()() const::{lambda()#2}::operator()() const::{lambda(float)#1}, std::array<char*, 2ul> >(int, at::native::sigmoid_kernel_cuda(at::TensorIteratorBase&)::{lambda()#2}::operator()() const::{lambda()#2}::operator()() const::{lambda(float)#1}, std::array<char*, 2ul>)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 122.60100000000466,
+      "cuda_total_us": 0.0,
+      "name": "aten::add",
+      "self_cpu_us": 79.82499999998936,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::CUDAFunctor_add<float> >(at::TensorIteratorBase&, at::native::CUDAFunctor_add<float> const&)::{lambda(int)#1}>(int, at::native::gpu_kernel_impl_nocast<at::native::CUDAFunctor_add<float> >(at::TensorIteratorBase&, at::native::CUDAFunctor_add<float> const&)::{lambda(int)#1})",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 184.59900000000562,
+      "cuda_total_us": 0.0,
+      "name": "aten::topk",
+      "self_cpu_us": 115.81700000001365,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::sbtopk::gatherTopK<float, unsigned int, 2, false>(at::cuda::detail::TensorInfo<float const, unsigned int>, unsigned int, unsigned int, bool, unsigned int, unsigned int, at::cuda::detail::TensorInfo<float, unsigned int>, unsigned int, at::cuda::detail::TensorInfo<long, unsigned int>, unsigned int, float*)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 129.64300000000367,
+      "cuda_total_us": 0.0,
+      "name": "aten::sum",
+      "self_cpu_us": 82.24500000000353,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 1839,
+      "cpu_total_us": 670.6299999997814,
+      "cuda_total_us": 0.0,
+      "name": "aten::as_strided",
+      "self_cpu_us": 670.6299999997814,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 1233,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "[memory]",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 176.62299999999823,
+      "cuda_total_us": 0.0,
+      "name": "aten::zeros",
+      "self_cpu_us": 26.018000000018674,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 127.60199999998713,
+      "cuda_total_us": 0.0,
+      "name": "aten::zero_",
+      "self_cpu_us": 32.89999999999509,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 94.70199999999204,
+      "cuda_total_us": 0.0,
+      "name": "aten::fill_",
+      "self_cpu_us": 38.68799999998237,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 113.82999999999674,
+      "cuda_total_us": 0.0,
+      "name": "aten::scatter_",
+      "self_cpu_us": 66.22499999998399,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    }
+  ],
+  "torch_version": "2.8.0+cu128",
+  "trace_path": "/tmp/torch_profile_5e8dc11cf2a942d58dce9419cbf34d5d.json",
+  "trace_size_bytes": 6117400,
+  "warmup_steps": 1,
+  "workload_axes": {
+    "seq_len": 14107
+  },
+  "workload_index": 8,
+  "workload_uuid": "5e8dc11c-f2a9-42d5-8dce-9419cbf34d5d"
+}

@@ -1,0 +1,245 @@
+{
+  "active_steps": 3,
+  "cuda_available": true,
+  "cuda_device_name": "NVIDIA B200",
+  "definition": "moe_fp8_block_scale_ds_routing_topk8_ng8_kg4_e32_h7168_i2048",
+  "num_workloads": 19,
+  "profile_table": "-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \n                                                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg       CPU Mem  Self CPU Mem      CUDA Mem  Self CUDA Mem    # of Calls  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \n                                 _dequant_weight_kernel         0.00%       0.000us         0.00%       0.000us       0.000us     888.013us        32.81%     888.013us      49.334us           0 B           0 B           0 B           0 B            18  \n                                               aten::mm         2.95%     290.556us         4.02%     395.703us      21.984us     456.409us        16.86%     456.409us      25.356us           0 B           0 B     396.00 KB     396.00 KB            18  \n                         Memcpy DtoH (Device -> Pinned)         0.00%       0.000us         0.00%       0.000us       0.000us     335.836us        12.41%     335.836us       3.198us           0 B           0 B           0 B           0 B           105  \nstd::enable_if<true, void>::type internal::gemvx::ke...         0.00%       0.000us         0.00%       0.000us       0.000us     332.442us        12.28%     332.442us      36.938us           0 B           0 B           0 B           0 B             9  \n                              aten::_local_scalar_dense         2.69%     264.928us        17.12%       1.688ms      17.578us     306.015us        11.31%     306.015us       3.188us           0 B           0 B           0 B           0 B            96  \n                                              aten::any        10.74%       1.059ms        26.04%       2.567ms      13.368us     250.334us         9.25%     413.977us       2.156us           0 B           0 B      96.00 KB      96.00 KB           192  \nvoid at::native::reduce_kernel<512, 1, at::native::R...         0.00%       0.000us         0.00%       0.000us       0.000us     250.334us         9.25%     250.334us       2.608us           0 B           0 B           0 B           0 B            96  \n                                            aten::copy_         3.09%     304.205us        10.36%       1.021ms       9.198us     192.603us         7.12%     192.603us       1.735us           0 B           0 B           0 B           0 B           111  \n                                               aten::eq         5.90%     581.923us        10.52%       1.037ms      10.474us     180.217us         6.66%     180.217us       1.820us           0 B           0 B      49.50 KB      49.50 KB            99  \nvoid at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us     175.193us         6.47%     175.193us       1.825us           0 B           0 B           0 B           0 B            96  \n                         Memcpy DtoD (Device -> Device)         0.00%       0.000us         0.00%       0.000us       0.000us     173.436us         6.41%     173.436us       1.700us           0 B           0 B           0 B           0 B           102  \nvoid gemv2T_kernel_val<int, int, float, float, float...         0.00%       0.000us         0.00%       0.000us       0.000us     123.967us         4.58%     123.967us      13.774us           0 B           0 B           0 B           0 B             9  \n                                          aten::nonzero         2.08%     204.898us         5.84%     575.900us      63.989us      81.658us         3.02%      81.658us       9.073us           0 B           0 B       4.50 KB           0 B             9  \n                          _dequant_hidden_states_kernel         0.00%       0.000us         0.00%       0.000us       0.000us      64.446us         2.38%      64.446us      21.482us           0 B           0 B           0 B           0 B             3  \n                                         _swiglu_kernel         0.00%       0.000us         0.00%       0.000us       0.000us      60.958us         2.25%      60.958us       6.773us           0 B           0 B           0 B           0 B             9  \n                                             aten::topk         0.93%      91.957us         1.43%     140.715us      15.635us      60.160us         2.22%      60.160us       6.684us           0 B           0 B       9.00 KB       9.00 KB             9  \n                                     aten::index_select         1.61%     159.005us         3.49%     343.644us      19.091us      42.466us         1.57%      42.466us       2.359us           0 B           0 B     261.00 KB           0 B            18  \nvoid at::native::(anonymous namespace)::indexSelectS...         0.00%       0.000us         0.00%       0.000us       0.000us      42.466us         1.57%      42.466us       2.359us           0 B           0 B           0 B           0 B            18  \nvoid at::native::sbtopk::gatherTopK<float, unsigned ...         0.00%       0.000us         0.00%       0.000us       0.000us      40.192us         1.49%      40.192us       6.699us           0 B           0 B           0 B           0 B             6  \n                                              aten::mul         1.38%     136.368us         2.27%     223.509us      14.901us      31.805us         1.18%      31.805us       2.120us           0 B           0 B     258.00 KB     258.00 KB            15  \nvoid at_cuda_detail::cub::DeviceSelectSweepKernel<at...         0.00%       0.000us         0.00%       0.000us       0.000us      21.950us         0.81%      21.950us       2.439us           0 B           0 B           0 B           0 B             9  \nvoid at::native::elementwise_kernel<128, 2, at::nati...         0.00%       0.000us         0.00%       0.000us       0.000us      20.797us         0.77%      20.797us       2.311us           0 B           0 B           0 B           0 B             9  \nvoid at::native::sbtopk::gatherTopK<float, unsigned ...         0.00%       0.000us         0.00%       0.000us       0.000us      19.968us         0.74%      19.968us       6.656us           0 B           0 B           0 B           0 B             3  \n                                       aten::index_add_         0.62%      61.458us         1.05%     103.609us      11.512us      18.111us         0.67%      18.111us       2.012us           0 B           0 B           0 B           0 B             9  \nvoid at::native::indexFuncSmallIndex<float, long, un...         0.00%       0.000us         0.00%       0.000us       0.000us      18.111us         0.67%      18.111us       2.012us           0 B           0 B           0 B           0 B             9  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \nSelf CPU time total: 9.855ms\nSelf CUDA time total: 2.706ms\n",
+  "solution_name": "my-team-solution-v1",
+  "top_ops": [
+    {
+      "calls": 63,
+      "cpu_total_us": 198.2399999999962,
+      "cuda_total_us": 0.0,
+      "name": "aten::empty",
+      "self_cpu_us": 198.2399999999962,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 1,
+      "cpu_total_us": 950.888,
+      "cuda_total_us": 0.0,
+      "name": "Activity Buffer Request",
+      "self_cpu_us": 950.888,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 30,
+      "cpu_total_us": 205.11399999999594,
+      "cuda_total_us": 0.0,
+      "name": "cuLaunchKernelEx",
+      "self_cpu_us": 205.11399999999594,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "_dequant_hidden_states_kernel",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 105,
+      "cpu_total_us": 187.4050000000068,
+      "cuda_total_us": 0.0,
+      "name": "aten::to",
+      "self_cpu_us": 21.192000000005464,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 166.21300000000133,
+      "cuda_total_us": 0.0,
+      "name": "aten::_to_copy",
+      "self_cpu_us": 31.879000000003543,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 38.97299999999905,
+      "cuda_total_us": 0.0,
+      "name": "aten::empty_strided",
+      "self_cpu_us": 38.97299999999905,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 111,
+      "cpu_total_us": 1020.9649999999933,
+      "cuda_total_us": 0.0,
+      "name": "aten::copy_",
+      "self_cpu_us": 304.20499999998924,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 336,
+      "cpu_total_us": 1756.5319999999988,
+      "cuda_total_us": 0.0,
+      "name": "cudaLaunchKernel",
+      "self_cpu_us": 1756.5319999999988,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#7}::operator()() const::{lambda(float)#1}, std::array<char*, 2ul>, 4, TrivialOffsetCalculator<1, unsigned int>, TrivialOffsetCalculator<1, unsigned int>, at::native::memory::LoadWithCast<1>, at::native::memory::StoreWithCast<1> >(int, at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#7}::operator()() const::{lambda(float)#1}, std::array<char*, 2ul>, TrivialOffsetCalculator<1, unsigned int>, TrivialOffsetCalculator<1, unsigned int>, at::native::memory::LoadWithCast<1>, at::native::memory::StoreWithCast<1>)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 111.67199999999866,
+      "cuda_total_us": 0.0,
+      "name": "aten::reshape",
+      "self_cpu_us": 28.86999999999989,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 102,
+      "cpu_total_us": 69.09200000000487,
+      "cuda_total_us": 0.0,
+      "name": "aten::view",
+      "self_cpu_us": 69.09200000000487,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 53.281000000001086,
+      "cuda_total_us": 0.0,
+      "name": "aten::sigmoid",
+      "self_cpu_us": 32.29700000000116,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::sigmoid_kernel_cuda(at::TensorIteratorBase&)::{lambda()#2}::operator()() const::{lambda()#2}::operator()() const::{lambda(float)#1}, std::array<char*, 2ul> >(int, at::native::sigmoid_kernel_cuda(at::TensorIteratorBase&)::{lambda()#2}::operator()() const::{lambda()#2}::operator()() const::{lambda(float)#1}, std::array<char*, 2ul>)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 97.8929999999998,
+      "cuda_total_us": 0.0,
+      "name": "aten::add",
+      "self_cpu_us": 62.12000000000057,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<float>, std::array<char*, 3ul> >(int, at::native::CUDAFunctor_add<float>, std::array<char*, 3ul>)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 140.7150000000022,
+      "cuda_total_us": 0.0,
+      "name": "aten::topk",
+      "self_cpu_us": 91.95700000000397,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::sbtopk::gatherTopK<float, unsigned int, 2, false>(at::cuda::detail::TensorInfo<float const, unsigned int>, unsigned int, unsigned int, bool, unsigned int, unsigned int, at::cuda::detail::TensorInfo<float, unsigned int>, unsigned int, at::cuda::detail::TensorInfo<long, unsigned int>, unsigned int, float*)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 106.07499999999823,
+      "cuda_total_us": 0.0,
+      "name": "aten::sum",
+      "self_cpu_us": 67.53699999999935,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 210,
+      "cpu_total_us": 110.652000000003,
+      "cuda_total_us": 0.0,
+      "name": "aten::as_strided",
+      "self_cpu_us": 110.652000000003,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::func_wrapper_t<float, at::native::sum_functor<float, float, float>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, float, 4, 4> >(at::native::ReduceOp<float, at::native::func_wrapper_t<float, at::native::sum_functor<float, float, float>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, float, 4, 4>)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "void at::native::sbtopk::gatherTopK<float, unsigned int, 1, false>(at::cuda::detail::TensorInfo<float const, unsigned int>, unsigned int, unsigned int, bool, unsigned int, unsigned int, at::cuda::detail::TensorInfo<float, unsigned int>, unsigned int, at::cuda::detail::TensorInfo<long, unsigned int>, unsigned int, float*)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 450,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 0.0,
+      "name": "[memory]",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 144.85300000000143,
+      "cuda_total_us": 0.0,
+      "name": "aten::zeros",
+      "self_cpu_us": 22.799000000003616,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 96.67799999999875,
+      "cuda_total_us": 0.0,
+      "name": "aten::zero_",
+      "self_cpu_us": 18.07699999999727,
+      "self_cuda_pct_topk": 0.0,
+      "self_cuda_us": 0.0
+    }
+  ],
+  "torch_version": "2.8.0+cu128",
+  "trace_path": "/tmp/torch_profile_e05c6c0356034a1cb34cdcce0ecaeea4.json",
+  "trace_size_bytes": 1654048,
+  "warmup_steps": 1,
+  "workload_axes": {
+    "seq_len": 1
+  },
+  "workload_index": 1,
+  "workload_uuid": "e05c6c03-5603-4a1c-b34c-dcce0ecaeea4"
+}
