@@ -146,6 +146,29 @@ def _close_registry(registry):
             return
 
 
+def _safe_number(value) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return 0.0
+
+
+def _get_event_metric(event, names) -> float:
+    for name in names:
+        if not hasattr(event, name):
+            continue
+        value = getattr(event, name)
+        if callable(value):
+            try:
+                value = value()
+            except Exception:
+                continue
+        num = _safe_number(value)
+        if num != 0.0:
+            return num
+    return 0.0
+
+
 def _invoke_runnable(runnable, inp):
     """Invoke runnable across possible input representations."""
     # kwargs-style inputs
@@ -302,15 +325,37 @@ def run_torch_profile(
         prof.export_chrome_trace(str(trace_path))
 
         events = list(prof.key_averages())
-        events.sort(key=lambda ev: float(getattr(ev, "self_cuda_time_total", 0.0)), reverse=True)
+        def _self_cuda_us(ev):
+            return _get_event_metric(
+                ev,
+                [
+                    "self_cuda_time_total",
+                    "self_device_time_total",
+                    "self_privateuse1_time_total",
+                ],
+            )
+
+        def _cuda_total_us(ev):
+            return _get_event_metric(
+                ev,
+                [
+                    "cuda_time_total",
+                    "device_time_total",
+                    "privateuse1_time_total",
+                ],
+            )
+
+        events.sort(key=_self_cuda_us, reverse=True)
         top_events = []
         for ev in events[: max(1, int(top_k))]:
+            self_cuda_us = _self_cuda_us(ev)
+            cuda_total_us = _cuda_total_us(ev)
             top_events.append(
                 {
                     "name": ev.key,
                     "calls": int(getattr(ev, "count", 0)),
-                    "self_cuda_us": float(getattr(ev, "self_cuda_time_total", 0.0)),
-                    "cuda_total_us": float(getattr(ev, "cuda_time_total", 0.0)),
+                    "self_cuda_us": float(self_cuda_us),
+                    "cuda_total_us": float(cuda_total_us),
                     "self_cpu_us": float(getattr(ev, "self_cpu_time_total", 0.0)),
                     "cpu_total_us": float(getattr(ev, "cpu_time_total", 0.0)),
                 }
@@ -321,7 +366,14 @@ def run_torch_profile(
             item["self_cuda_pct_topk"] = (item["self_cuda_us"] / total_self_cuda_us) * 100.0
 
         trace_size = trace_path.stat().st_size if trace_path.exists() else 0
-        table = prof.key_averages().table(sort_by="self_cuda_time_total", row_limit=max(10, top_k))
+        try:
+            table = prof.key_averages().table(
+                sort_by="self_cuda_time_total", row_limit=max(10, top_k)
+            )
+        except Exception:
+            table = prof.key_averages().table(
+                sort_by="self_device_time_total", row_limit=max(10, top_k)
+            )
 
         result = {
             "solution_name": solution.name,

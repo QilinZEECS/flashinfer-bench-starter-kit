@@ -1,0 +1,245 @@
+{
+  "active_steps": 3,
+  "cuda_available": true,
+  "cuda_device_name": "NVIDIA B200",
+  "definition": "moe_fp8_block_scale_ds_routing_topk8_ng8_kg4_e32_h7168_i2048",
+  "num_workloads": 19,
+  "profile_table": "-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \n                                                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg       CPU Mem  Self CPU Mem      CUDA Mem  Self CUDA Mem    # of Calls  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \n                                 _dequant_weight_kernel         0.00%       0.000us         0.00%       0.000us       0.000us     887.929us        34.20%     887.929us      49.329us           0 B           0 B           0 B           0 B            18  \n                                               aten::mm         2.63%     263.057us         3.88%     388.075us      21.560us     457.693us        17.63%     457.693us      25.427us           0 B           0 B     396.00 KB     396.00 KB            18  \n                         Memcpy DtoH (Device -> Pinned)         0.00%       0.000us         0.00%       0.000us       0.000us     353.856us        13.63%     353.856us       3.370us           0 B           0 B           0 B           0 B           105  \nstd::enable_if<true, void>::type internal::gemvx::ke...         0.00%       0.000us         0.00%       0.000us       0.000us     334.044us        12.87%     334.044us      37.116us           0 B           0 B           0 B           0 B             9  \n                              aten::_local_scalar_dense         2.30%     229.893us        17.16%       1.718ms      17.892us     327.071us        12.60%     327.071us       3.407us           0 B           0 B           0 B           0 B            96  \n                                              aten::any         9.96%     997.052us        24.96%       2.499ms      13.017us     198.782us         7.66%     331.231us       1.725us           0 B           0 B      96.00 KB      96.00 KB           192  \nvoid at::native::reduce_kernel<512, 1, at::native::R...         0.00%       0.000us         0.00%       0.000us       0.000us     198.782us         7.66%     198.782us       2.071us           0 B           0 B           0 B           0 B            96  \n                                            aten::copy_         2.63%     263.711us         9.91%     991.811us       8.935us     157.182us         6.05%     157.182us       1.416us           0 B           0 B           0 B           0 B           111  \n                                               aten::eq         5.29%     529.326us         9.94%     995.528us      10.056us     144.026us         5.55%     144.026us       1.455us           0 B           0 B      49.50 KB      49.50 KB            99  \n                         Memcpy DtoD (Device -> Device)         0.00%       0.000us         0.00%       0.000us       0.000us     140.416us         5.41%     140.416us       1.377us           0 B           0 B           0 B           0 B           102  \nvoid at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us     139.482us         5.37%     139.482us       1.453us           0 B           0 B           0 B           0 B            96  \nvoid gemv2T_kernel_val<int, int, float, float, float...         0.00%       0.000us         0.00%       0.000us       0.000us     123.649us         4.76%     123.649us      13.739us           0 B           0 B           0 B           0 B             9  \n                          _dequant_hidden_states_kernel         0.00%       0.000us         0.00%       0.000us       0.000us      87.935us         3.39%      87.935us      29.312us           0 B           0 B           0 B           0 B             3  \n                                          aten::nonzero         1.86%     185.785us         5.57%     557.352us      61.928us      72.927us         2.81%      72.927us       8.103us           0 B           0 B       4.50 KB           0 B             9  \n                                         _swiglu_kernel         0.00%       0.000us         0.00%       0.000us       0.000us      60.416us         2.33%      60.416us       6.713us           0 B           0 B           0 B           0 B             9  \n                                             aten::topk         1.33%     132.879us         1.89%     189.565us      21.063us      55.935us         2.15%      55.935us       6.215us           0 B           0 B       9.00 KB       9.00 KB             9  \n                                     aten::index_select         1.23%     123.609us         3.15%     315.428us      17.524us      38.816us         1.50%      38.816us       2.156us           0 B           0 B     261.00 KB           0 B            18  \nvoid at::native::(anonymous namespace)::indexSelectS...         0.00%       0.000us         0.00%       0.000us       0.000us      38.816us         1.50%      38.816us       2.156us           0 B           0 B           0 B           0 B            18  \nvoid at::native::sbtopk::gatherTopK<float, unsigned ...         0.00%       0.000us         0.00%       0.000us       0.000us      36.832us         1.42%      36.832us       6.139us           0 B           0 B           0 B           0 B             6  \n                                              aten::mul         1.12%     111.826us         2.04%     204.361us      13.624us      28.287us         1.09%      28.287us       1.886us           0 B           0 B     258.00 KB     258.00 KB            15  \nvoid at_cuda_detail::cub::DeviceSelectSweepKernel<at...         0.00%       0.000us         0.00%       0.000us       0.000us      21.150us         0.81%      21.150us       2.350us           0 B           0 B           0 B           0 B             9  \nvoid at::native::elementwise_kernel<128, 2, at::nati...         0.00%       0.000us         0.00%       0.000us       0.000us      19.456us         0.75%      19.456us       2.162us           0 B           0 B           0 B           0 B             9  \n                                       aten::index_add_         0.57%      57.053us         1.06%     106.196us      11.800us      19.198us         0.74%      19.198us       2.133us           0 B           0 B           0 B           0 B             9  \nvoid at::native::indexFuncSmallIndex<float, long, un...         0.00%       0.000us         0.00%       0.000us       0.000us      19.198us         0.74%      19.198us       2.133us           0 B           0 B           0 B           0 B             9  \nvoid at::native::sbtopk::gatherTopK<float, unsigned ...         0.00%       0.000us         0.00%       0.000us       0.000us      19.103us         0.74%      19.103us       6.368us           0 B           0 B           0 B           0 B             3  \n-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  \nSelf CPU time total: 10.012ms\nSelf CUDA time total: 2.596ms\n",
+  "solution_name": "my-team-solution-v1",
+  "top_ops": [
+    {
+      "calls": 18,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 887.9290000000001,
+      "name": "_dequant_weight_kernel",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 22.30427625753566,
+      "self_cuda_us": 887.9290000000001
+    },
+    {
+      "calls": 18,
+      "cpu_total_us": 388.0750000000007,
+      "cuda_total_us": 457.6929999999993,
+      "name": "aten::mm",
+      "self_cpu_us": 263.05700000000115,
+      "self_cuda_pct_topk": 11.496990314698868,
+      "self_cuda_us": 457.6929999999993
+    },
+    {
+      "calls": 105,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 353.85599999999977,
+      "name": "Memcpy DtoH (Device -> Pinned)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 8.88866337216887,
+      "self_cuda_us": 353.85599999999977
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 334.0439999999985,
+      "name": "std::enable_if<true, void>::type internal::gemvx::kernel<int, int, float, float, float, float, true, true, true, false, 7, false, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<float const>, cublasGemvTensorStridedBatched<float const>, cublasGemvTensorStridedBatched<float>, float> >(cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<float const>, cublasGemvTensorStridedBatched<float const>, cublasGemvTensorStridedBatched<float>, float>)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 8.390997093430002,
+      "self_cuda_us": 334.0439999999985
+    },
+    {
+      "calls": 96,
+      "cpu_total_us": 1717.6530000000034,
+      "cuda_total_us": 327.070999999999,
+      "name": "aten::_local_scalar_dense",
+      "self_cpu_us": 229.89300000000912,
+      "self_cuda_pct_topk": 8.215839261729736,
+      "self_cuda_us": 327.070999999999
+    },
+    {
+      "calls": 192,
+      "cpu_total_us": 2499.2969999999946,
+      "cuda_total_us": 331.2309999999925,
+      "name": "aten::any",
+      "self_cpu_us": 997.0520000000124,
+      "self_cuda_pct_topk": 4.9932918544450136,
+      "self_cuda_us": 198.78200000000243
+    },
+    {
+      "calls": 96,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 198.78200000000243,
+      "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<bool, at::native::func_wrapper_t<bool, at::native::or_kernel_cuda(at::TensorIterator&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(bool, bool)#1}>, unsigned int, bool, 4, 4> >(at::native::ReduceOp<bool, at::native::func_wrapper_t<bool, at::native::or_kernel_cuda(at::TensorIterator&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(bool, bool)#1}>, unsigned int, bool, 4, 4>)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 4.9932918544450136,
+      "self_cuda_us": 198.78200000000243
+    },
+    {
+      "calls": 111,
+      "cpu_total_us": 991.810999999981,
+      "cuda_total_us": 157.18199999999024,
+      "name": "aten::copy_",
+      "self_cpu_us": 263.71099999998637,
+      "self_cuda_pct_topk": 3.948323290163686,
+      "self_cuda_us": 157.18199999999024
+    },
+    {
+      "calls": 99,
+      "cpu_total_us": 995.5280000000012,
+      "cuda_total_us": 144.0259999999962,
+      "name": "aten::eq",
+      "self_cpu_us": 529.3259999999968,
+      "self_cuda_pct_topk": 3.617851981709963,
+      "self_cuda_us": 144.0259999999962
+    },
+    {
+      "calls": 102,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 140.4159999999897,
+      "name": "Memcpy DtoD (Device -> Device)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 3.5271708154344514,
+      "self_cuda_us": 140.4159999999897
+    },
+    {
+      "calls": 96,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 139.48199999999542,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::AUnaryFunctor<long, long, bool, at::native::(anonymous namespace)::CompareEqFunctor<long> >, std::array<char*, 2ul> >(int, at::native::AUnaryFunctor<long, long, bool, at::native::(anonymous namespace)::CompareEqFunctor<long> >, std::array<char*, 2ul>)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 3.503709261611555,
+      "self_cuda_us": 139.48199999999542
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 123.6490000000008,
+      "name": "void gemv2T_kernel_val<int, int, float, float, float, float, 128, 16, 4, 4, false, false, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<float const>, cublasGemvTensorStridedBatched<float const>, cublasGemvTensorStridedBatched<float>, float> >(cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<float const>, cublasGemvTensorStridedBatched<float const>, cublasGemvTensorStridedBatched<float>, float>, float, float)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 3.1059932212688675,
+      "self_cuda_us": 123.6490000000008
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 87.93500000000017,
+      "name": "_dequant_hidden_states_kernel",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 2.208877661058938,
+      "self_cuda_us": 87.93500000000017
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 557.3519999999994,
+      "cuda_total_us": 72.92699999999695,
+      "name": "aten::nonzero",
+      "self_cpu_us": 185.78499999998894,
+      "self_cuda_pct_topk": 1.8318851559451657,
+      "self_cuda_us": 72.92699999999695
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 60.41599999999653,
+      "name": "_swiglu_kernel",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 1.5176158841249658,
+      "self_cuda_us": 60.41599999999653
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 189.56499999999755,
+      "cuda_total_us": 55.93499999999881,
+      "name": "aten::topk",
+      "self_cpu_us": 132.8789999999983,
+      "self_cuda_pct_topk": 1.405055688535041,
+      "self_cuda_us": 55.93499999999881
+    },
+    {
+      "calls": 18,
+      "cpu_total_us": 315.427999999999,
+      "cuda_total_us": 38.81600000000071,
+      "name": "aten::index_select",
+      "self_cpu_us": 123.60899999999901,
+      "self_cuda_pct_topk": 0.9750360526714635,
+      "self_cuda_us": 38.81600000000071
+    },
+    {
+      "calls": 18,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 38.81600000000071,
+      "name": "void at::native::(anonymous namespace)::indexSelectSmallIndex<float, long, unsigned int, 2, 2, -2>(at::cuda::detail::TensorInfo<float, unsigned int>, at::cuda::detail::TensorInfo<float const, unsigned int>, at::cuda::detail::TensorInfo<long const, unsigned int>, int, int, unsigned int, long)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.9750360526714635,
+      "self_cuda_us": 38.81600000000071
+    },
+    {
+      "calls": 6,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 36.83199999999897,
+      "name": "void at::native::sbtopk::gatherTopK<float, unsigned int, 1, false>(at::cuda::detail::TensorInfo<float const, unsigned int>, unsigned int, unsigned int, bool, unsigned int, unsigned int, at::cuda::detail::TensorInfo<float, unsigned int>, unsigned int, at::cuda::detail::TensorInfo<long, unsigned int>, unsigned int, float*)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.9251990903749402,
+      "self_cuda_us": 36.83199999999897
+    },
+    {
+      "calls": 15,
+      "cpu_total_us": 204.3609999999967,
+      "cuda_total_us": 28.287000000004355,
+      "name": "aten::mul",
+      "self_cpu_us": 111.82599999999502,
+      "self_cuda_pct_topk": 0.7105535042745628,
+      "self_cuda_us": 28.287000000004355
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 21.149999999998727,
+      "name": "void at_cuda_detail::cub::DeviceSelectSweepKernel<at_cuda_detail::cub::detail::device_select_policy_hub<long, bool, int, false, false>::Policy900, at_cuda_detail::cub::CountingInputIterator<long, long>, at_cuda_detail::cub::TransformInputIterator<bool, at::native::(anonymous namespace)::NonZeroOp<bool>, bool const*, long>, long*, int*, at_cuda_detail::cub::ScanTileState<int, true>, at_cuda_detail::cub::NullType, at_cuda_detail::cub::NullType, int, false, false>(at_cuda_detail::cub::CountingInputIterator<long, long>, at_cuda_detail::cub::TransformInputIterator<bool, at::native::(anonymous namespace)::NonZeroOp<bool>, bool const*, long>, long*, int*, at_cuda_detail::cub::ScanTileState<int, true>, at_cuda_detail::cub::NullType, at_cuda_detail::cub::NullType, int, int, at_cuda_detail::cub::detail::vsmem_t)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.5312760849649586,
+      "self_cuda_us": 21.149999999998727
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 19.45600000000104,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float> > >(at::TensorIteratorBase&, at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float> > const&)::{lambda(int)#1}>(int, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float> > >(at::TensorIteratorBase&, at::native::BinaryFunctor<float, float, float, at::native::binary_internal::MulFunctor<float> > const&)::{lambda(int)#1})",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.4887237592945347,
+      "self_cuda_us": 19.45600000000104
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 106.19600000000219,
+      "cuda_total_us": 19.19800000000214,
+      "name": "aten::index_add_",
+      "self_cpu_us": 57.0530000000017,
+      "self_cuda_pct_topk": 0.4822429446410887,
+      "self_cuda_us": 19.19800000000214
+    },
+    {
+      "calls": 9,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 19.19800000000214,
+      "name": "void at::native::indexFuncSmallIndex<float, long, unsigned int, 2, 2, -2, at::native::(anonymous namespace)::ReduceAdd>(at::cuda::detail::TensorInfo<float, unsigned int>, at::cuda::detail::TensorInfo<float const, unsigned int>, at::cuda::detail::TensorInfo<long const, unsigned int>, int, int, unsigned int, long, long, at::native::(anonymous namespace)::ReduceAdd const&, float)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.4822429446410887,
+      "self_cuda_us": 19.19800000000214
+    },
+    {
+      "calls": 3,
+      "cpu_total_us": 0.0,
+      "cuda_total_us": 19.102999999999838,
+      "name": "void at::native::sbtopk::gatherTopK<float, unsigned int, 2, false>(at::cuda::detail::TensorInfo<float const, unsigned int>, unsigned int, unsigned int, bool, unsigned int, unsigned int, at::cuda::detail::TensorInfo<float, unsigned int>, unsigned int, at::cuda::detail::TensorInfo<long, unsigned int>, unsigned int, float*)",
+      "self_cpu_us": 0.0,
+      "self_cuda_pct_topk": 0.4798565981601006,
+      "self_cuda_us": 19.102999999999838
+    }
+  ],
+  "torch_version": "2.8.0+cu128",
+  "trace_path": "/tmp/torch_profile_e05c6c0356034a1cb34cdcce0ecaeea4.json",
+  "trace_size_bytes": 1654061,
+  "warmup_steps": 1,
+  "workload_axes": {
+    "seq_len": 1
+  },
+  "workload_index": 1,
+  "workload_uuid": "e05c6c03-5603-4a1c-b34c-dcce0ecaeea4"
+}
