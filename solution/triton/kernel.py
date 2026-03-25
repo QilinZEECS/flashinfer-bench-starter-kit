@@ -6,7 +6,7 @@ Strategy:
   - Sort tokens by expert, build per-tile dispatch table
   - GEMM1: FP8 A (with block scale) × FP8 B (with block scale) → FP32, all tiles parallel
   - SwiGLU elementwise (PyTorch)
-  - GEMM2: FP32 A (no scale) × FP8 B (with block scale) → FP32, all tiles parallel
+  - GEMM2: FP32 A → dynamic FP8 quant per tile × FP8 B (with block scale) → FP32, FP8 tensor cores
   - Vectorized weighted index_add_ (no per-expert Python loop)
 """
 
@@ -101,17 +101,20 @@ def _gemm1_kernel(
     tl.store(c_ptrs, acc, mask=m_valid[:, None] & n_valid[None, :])
 
 
-# ─── Triton GEMM2: FP32 A (no scale) × FP8 B (with block scale) ──────────────
+# ─── Triton GEMM2: pre-scaled FP16 A × FP8 B (with block scale) ──────────────
+# A is pre-normalized outside kernel (once per K-block per row), avoids redundant
+# per-row max reductions across all N tiles.
 
 @triton.jit
 def _gemm2_kernel(
-    A_ptr,                     # A: [tv, K] FP32 (SwiGLU output, no scale needed)
+    A_ptr, A_sc_ptr,           # A: [tv, K] FP16 (pre-normalized);  A_sc: [tv, K_sc] FP32
     B_ptr, B_sc_ptr,           # B: [E_loc, N, K] FP8;  B_sc: [E_loc, N_sc, K_sc]
     C_ptr,                     # C: [tv, N] FP32
     tile_expert_ptr, tile_row_ptr,
     exp_off_ptr, exp_cnt_ptr, exp_eid_ptr,
     N, K, K_sc, N_sc,
     stride_am, stride_ak,
+    stride_ascm, stride_asck,
     stride_be, stride_bn, stride_bk,
     stride_bscE, stride_bscN, stride_bscK,
     stride_cm, stride_cn,
@@ -144,30 +147,35 @@ def _gemm2_kernel(
     B_base   = B_ptr    + eid * stride_be
     Bsc_base = B_sc_ptr + eid * stride_bscE
     A_base   = A_ptr    + exp_off * stride_am
+    Asc_base = A_sc_ptr + exp_off * stride_ascm
     C_base   = C_ptr    + exp_off * stride_cm
 
     for k_blk in range(tl.cdiv(K, BLOCK_K)):
         k_offs  = k_blk * BLOCK_K + k_offs_base
         k_valid = k_offs < K
 
-        # A tile [BLOCK_M, BLOCK_K]  FP32
-        a_ptrs = A_base + m_offs[:, None] * stride_am + k_offs[None, :] * stride_ak
+        # A tile [BLOCK_M, BLOCK_K]  FP16 (pre-normalized, load as-is)
+        a_ptrs = A_base + m_offs[:, None] * stride_am + k_offs[None, :]
         a_tile = tl.load(a_ptrs,
                          mask=m_valid[:, None] & k_valid[None, :],
                          other=0.0)
 
-        # B tile [BLOCK_N, BLOCK_K]  FP8 → FP32
+        # A_sc [BLOCK_M]: per-row scale for this K-block (pre-computed outside kernel)
+        asc_ptrs = Asc_base + m_offs * stride_ascm + k_blk
+        a_sc = tl.load(asc_ptrs, mask=m_valid, other=1.0)
+
+        # B tile [BLOCK_N, BLOCK_K]  FP8 → FP16 for tensor-core dot
         b_ptrs = B_base + n_offs[:, None] * stride_bn + k_offs[None, :] * stride_bk
         b_tile = tl.load(b_ptrs,
                          mask=n_valid[:, None] & k_valid[None, :],
-                         other=0.0).to(tl.float32)
+                         other=0.0).to(tl.float16)
 
         # B scale scalar
         b_sc = tl.load(Bsc_base + pid_n * stride_bscN + k_blk * stride_bscK)
 
-        # FP32 dot, accumulate FP32
+        # FP16×FP16→FP32 tensor-core dot, apply A per-row scale + B scale after
         raw_dot = tl.dot(a_tile, tl.trans(b_tile), out_dtype=tl.float32)
-        acc    += raw_dot * b_sc
+        acc    += raw_dot * a_sc[:, None] * b_sc
 
     c_ptrs = C_base + m_offs[:, None] * stride_cm + n_offs[None, :] * stride_cn
     tl.store(c_ptrs, acc, mask=m_valid[:, None] & n_valid[None, :])
@@ -207,18 +215,20 @@ def _run_gemm1(A, A_sc, B, B_sc, C, tile_expert, tile_row,
     )
 
 
-def _run_gemm2(A, B, B_sc, C, tile_expert, tile_row,
+def _run_gemm2(A_fp16, A_sc, B, B_sc, C, tile_expert, tile_row,
                exp_off, exp_cnt, exp_eid, BLOCK_M=64, BLOCK_N=128):
-    tv, K = A.shape
+    """A_fp16: [tv, K] FP16 (pre-normalized); A_sc: [tv, K_sc] FP32 (per-row-kblock scales)."""
+    tv, K = A_fp16.shape
     N = B.shape[1]
-    K_sc = B_sc.shape[2]
+    K_sc = A_sc.shape[1]
     N_sc = B_sc.shape[1]
     grid = (tile_expert.shape[0], triton.cdiv(N, BLOCK_N))
     _gemm2_kernel[grid](
-        A, B, B_sc, C,
+        A_fp16, A_sc, B, B_sc, C,
         tile_expert, tile_row, exp_off, exp_cnt, exp_eid,
         N, K, K_sc, N_sc,
-        A.stride(0), A.stride(1),
+        A_fp16.stride(0), A_fp16.stride(1),
+        A_sc.stride(0), A_sc.stride(1),
         B.stride(0), B.stride(1), B.stride(2),
         B_sc.stride(0), B_sc.stride(1), B_sc.stride(2),
         C.stride(0), C.stride(1),
@@ -346,12 +356,19 @@ def kernel(
 
     # ── GEMM2 via Triton ──────────────────────────────────────────────────────
     # c_out [tv, I] @ W2[E, H, I].T → [tv, H]
+    # Pre-compute per-row-kblock FP16 normalization of c_out so the kernel
+    # can load pre-scaled FP16 A without redundant reductions across N tiles.
+    K2_sc = I // BLOCK_SC   # = 16  (number of K-blocks in GEMM2)
+    c_blk = c_out.reshape(tv, K2_sc, BLOCK_SC)          # [tv, 16, 128] FP32
+    c_sc  = c_blk.abs().amax(dim=2).clamp(min=1e-8)     # [tv, 16] FP32
+    c_fp16 = (c_blk / c_sc.unsqueeze(-1)).reshape(tv, I).to(torch.float16).contiguous()
+
     tile_exp2, tile_row2 = _build_tile_map(cnt_list, BLOCK_M, device)
 
     o_out = torch.empty(tv, H, dtype=torch.float32, device=device)
 
     _run_gemm2(
-        c_out,
+        c_fp16, c_sc,
         gemm2_weights, gemm2_weights_scale,
         o_out,
         tile_exp2, tile_row2, exp_off_t, exp_cnt_t, exp_eid_t,
