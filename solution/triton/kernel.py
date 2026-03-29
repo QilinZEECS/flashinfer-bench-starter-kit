@@ -4,11 +4,11 @@ Fused MoE Kernel for FlashInfer Competition.
 Track: moe_fp8_block_scale_ds_routing_topk8_ng8_kg4_e32_h7168_i2048
 Model: DeepSeek-V3/R1
 
-V008: Grouped GEMM — eliminates Python expert loop.
-- 3D Triton grid (experts x M_tiles x N_tiles) processes all experts in one launch
-- 3 kernel launches (GEMM1 + SwiGLU + GEMM2) + 1 index_add_ replaces ~128 launches
-- Eliminates per-expert Python overhead and kernel launch latency
-- FP8 tensor cores for GEMM1, TF32 for GEMM2
+V009: Fused weight epilogue + fused routing.
+- Grouped GEMM with 3D grid (experts x M_tiles x N_tiles)
+- Weight multiply fused into GEMM2 store epilogue (eliminates temp + kernel)
+- Routing fused into single Triton kernel (replaces ~10 PyTorch ops)
+- Sparse routing output [T, TOP_K] eliminates dense [T, E_GLOBAL] weight matrix
 """
 
 import torch
@@ -113,6 +113,7 @@ def _grouped_fused_dequant_gemm_kernel(
     B_ptr, B_scale_ptr,
     C_ptr,
     expert_offsets_ptr, expert_ids_ptr,
+    weights_ptr,
     N: tl.constexpr, K: tl.constexpr,
     stride_am, stride_be, stride_bn, stride_bse,
     stride_cm,
@@ -122,6 +123,7 @@ def _grouped_fused_dequant_gemm_kernel(
 
     3D grid: (num_experts, max_m_tiles, N // 128).
     TF32 tensor cores, FP32 accumulator.
+    Fuses per-row weight multiply into store epilogue.
     """
     BLOCK_N: tl.constexpr = 128
     BLOCK_K: tl.constexpr = 128
@@ -172,9 +174,80 @@ def _grouped_fused_dequant_gemm_kernel(
         a_ptrs += BLOCK_K
         bt_ptrs += BLOCK_K
 
+    # Fuse per-row weight multiply into store
+    w = tl.load(weights_ptr + offs_m, mask=mask_m, other=0.0)
+    acc = acc * w[:, None]
+
     # Store result
     c_ptrs = C_ptr + offs_m[:, None] * stride_cm + (pid_n * BLOCK_N + tl.arange(0, BLOCK_N))[None, :]
     tl.store(c_ptrs, acc, mask=mask_m[:, None])
+
+
+@triton.jit
+def _routing_kernel(
+    logits_ptr, bias_ptr,
+    topk_idx_ptr, topk_weights_ptr,
+    routed_scaling_factor,
+    stride_logits,
+    E_GLOBAL: tl.constexpr,
+    N_GROUP: tl.constexpr,
+    GROUP_SIZE: tl.constexpr,
+    TOPK_GROUP: tl.constexpr,
+    TOP_K: tl.constexpr,
+):
+    """Fused DeepSeek-V3 routing: sigmoid + group scoring + topk selection.
+
+    Grid: (T,). Each program handles one token.
+    Outputs sparse topk_idx[T, TOP_K] and topk_weights[T, TOP_K].
+    """
+    t = tl.program_id(0)
+    NEG_INF = float('-inf')
+    offs_e = tl.arange(0, E_GLOBAL)
+
+    # Step 1: sigmoid + bias
+    logits = tl.load(logits_ptr + t * stride_logits + offs_e).to(tl.float32)
+    bias = tl.load(bias_ptr + offs_e).to(tl.float32)
+    s = tl.sigmoid(logits)
+    s_with_bias = s + bias
+
+    expert_group = offs_e // GROUP_SIZE  # [E_GLOBAL] group id per expert
+
+    # Step 2: Group scoring — top-2 per group via masked max on [E_GLOBAL]
+    offs_g = tl.arange(0, N_GROUP)
+    group_scores = tl.zeros((N_GROUP,), dtype=tl.float32)
+    for g in tl.static_range(N_GROUP):
+        g_vals = tl.where(expert_group == g, s_with_bias, NEG_INF)
+        top1_idx = tl.argmax(g_vals, axis=0)
+        top1_val = tl.max(g_vals, axis=0)
+        g_vals2 = tl.where(offs_e == top1_idx, NEG_INF, g_vals)
+        top2_val = tl.max(g_vals2, axis=0)
+        top2_val = tl.where(top2_val == NEG_INF, 0.0, top2_val)
+        group_scores = tl.where(offs_g == g, top1_val + top2_val, group_scores)
+
+    # Step 3: Top-4 groups → directly mark valid experts in [E_GLOBAL]
+    expert_valid = tl.zeros((E_GLOBAL,), dtype=tl.float32)
+    gs_work = group_scores
+    for _k in tl.static_range(TOPK_GROUP):
+        g_idx = tl.argmax(gs_work, axis=0)
+        expert_valid = tl.where(expert_group == g_idx, 1.0, expert_valid)
+        gs_work = tl.where(offs_g == g_idx, NEG_INF, gs_work)
+
+    # Step 4: Top-8 experts from valid set
+    scores_pruned = tl.where(expert_valid > 0.0, s_with_bias, NEG_INF)
+    for k in tl.static_range(TOP_K):
+        best_idx = tl.argmax(scores_pruned, axis=0)
+        tl.store(topk_idx_ptr + t * TOP_K + k, best_idx.to(tl.int64))
+        # Extract unbiased sigmoid at selected index for weight computation
+        s_val = tl.sum(tl.where(offs_e == best_idx, s, 0.0))
+        tl.store(topk_weights_ptr + t * TOP_K + k, s_val)
+        scores_pruned = tl.where(offs_e == best_idx, NEG_INF, scores_pruned)
+
+    # Step 5: Normalize weights
+    w_offs = tl.arange(0, TOP_K)
+    w_vals = tl.load(topk_weights_ptr + t * TOP_K + w_offs)
+    w_sum = tl.sum(w_vals, axis=0) + 1e-20
+    w_norm = (w_vals / w_sum) * routed_scaling_factor
+    tl.store(topk_weights_ptr + t * TOP_K + w_offs, w_norm)
 
 
 @triton.jit
@@ -226,8 +299,8 @@ def _grouped_fp8_dual_dequant_gemm(A_fp8, A_scale, B_fp8, B_scale,
 
 def _grouped_fused_dequant_gemm(A, B_fp8, B_scale,
                                  expert_offsets, expert_ids,
-                                 max_count, N, K, out):
-    """Grouped GEMM2: all experts in single launch."""
+                                 weights, max_count, N, K, out):
+    """Grouped GEMM2: all experts in single launch, with fused weight multiply."""
     num_experts = expert_ids.shape[0]
     grid = lambda META: (
         num_experts,
@@ -239,6 +312,7 @@ def _grouped_fused_dequant_gemm(A, B_fp8, B_scale,
         B_fp8, B_scale,
         out,
         expert_offsets, expert_ids,
+        weights,
         N, K,
         A.stride(0),
         B_fp8.stride(0), B_fp8.stride(1),
@@ -255,44 +329,32 @@ def _swiglu(gemm1_out, N, I, out=None):
     return result
 
 
-def _deepseek_v3_routing(routing_logits, routing_bias, routed_scaling_factor):
-    """DeepSeek-V3 no-aux routing."""
+def _fused_routing(routing_logits, routing_bias, routed_scaling_factor):
+    """Fused DeepSeek-V3 routing via single Triton kernel.
+
+    Returns topk_idx [T, TOP_K] and topk_weights [T, TOP_K] (sparse).
+    """
     T = routing_logits.shape[0]
     device = routing_logits.device
-
-    logits = routing_logits.to(torch.float32)
-    bias = routing_bias.to(torch.float32).reshape(-1)
-
-    s = torch.sigmoid(logits)
-    s_with_bias = s + bias
-
     group_size = E_GLOBAL // N_GROUP
-    s_wb_grouped = s_with_bias.view(T, N_GROUP, group_size)
 
-    top2_vals, _ = torch.topk(s_wb_grouped, k=2, dim=2, largest=True, sorted=False)
-    group_scores = top2_vals.sum(dim=2)
+    logits = routing_logits.to(torch.float32).contiguous()
+    bias = routing_bias.to(torch.float32).reshape(-1).contiguous()
 
-    _, group_idx = torch.topk(group_scores, k=TOPK_GROUP, dim=1, largest=True, sorted=False)
-    group_mask = torch.zeros(T, N_GROUP, device=device)
-    group_mask.scatter_(1, group_idx, 1.0)
-    score_mask = (
-        group_mask
-        .unsqueeze(2)
-        .expand(T, N_GROUP, group_size)
-        .reshape(T, E_GLOBAL)
-    )
+    topk_idx = torch.empty((T, TOP_K), dtype=torch.int64, device=device)
+    topk_weights = torch.empty((T, TOP_K), dtype=torch.float32, device=device)
 
-    neg_inf = torch.finfo(torch.float32).min
-    scores_pruned = s_with_bias.masked_fill(score_mask == 0, neg_inf)
-    _, topk_idx = torch.topk(scores_pruned, k=TOP_K, dim=1, largest=True, sorted=False)
+    if T > 0:
+        _routing_kernel[(T,)](
+            logits, bias,
+            topk_idx, topk_weights,
+            routed_scaling_factor,
+            logits.stride(0),
+            E_GLOBAL, N_GROUP, group_size, TOPK_GROUP, TOP_K,
+            num_warps=4,
+        )
 
-    expert_mask = torch.zeros(T, E_GLOBAL, device=device)
-    expert_mask.scatter_(1, topk_idx, 1.0)
-    weights = s * expert_mask
-    weights_sum = weights.sum(dim=1, keepdim=True) + 1e-20
-    weights = (weights / weights_sum) * routed_scaling_factor
-
-    return topk_idx, weights
+    return topk_idx, topk_weights
 
 
 # ── Main entry point (DPS) ──────────────────────────────────────────
@@ -310,13 +372,12 @@ def kernel(
     routed_scaling_factor,
     output,
 ):
-    """Fused MoE kernel: grouped GEMM (V008).
+    """Fused MoE kernel: grouped GEMM + fused routing (V009).
 
-    Key changes from V007:
-    1. Eliminates Python expert loop — all experts in single kernel launch
-    2. 3D Triton grid (experts x M_tiles x N_tiles) with per-expert early exit
-    3. 3 kernel launches + 1 index_add_ replaces ~128 per-expert launches
-    4. Reduces kernel launch overhead and Python-side synchronization
+    Key changes from V008:
+    1. Routing fused into single Triton kernel (was ~10 PyTorch CUDA ops)
+    2. Sparse routing output [T, TOP_K] eliminates dense [T, E_GLOBAL] allocation
+    3. Weight multiply fused into GEMM2 store epilogue
     """
     device = hidden_states.device
     T = routing_logits.shape[0]
@@ -328,20 +389,21 @@ def kernel(
     local_start = local_expert_offset.item() if isinstance(local_expert_offset, torch.Tensor) else int(local_expert_offset)
     scaling = routed_scaling_factor.item() if isinstance(routed_scaling_factor, torch.Tensor) else float(routed_scaling_factor)
 
-    # ── Part A: Routing ──
-    topk_idx, weights = _deepseek_v3_routing(
+    # ── Part A: Routing (single Triton kernel) ──
+    topk_idx, topk_weights = _fused_routing(
         routing_logits, routing_bias, scaling,
     )
 
     # ── Part B: Sorted dispatch ──
     token_ids = torch.arange(T, device=device).unsqueeze(1).expand(T, TOP_K).reshape(-1)
     expert_ids = topk_idx.reshape(-1)
+    flat_weights = topk_weights.reshape(-1)
     local_expert_ids = expert_ids - local_start
 
     valid_mask = (local_expert_ids >= 0) & (local_expert_ids < E_local)
     valid_token_ids = token_ids[valid_mask]
     valid_local_expert_ids = local_expert_ids[valid_mask]
-    valid_global_expert_ids = expert_ids[valid_mask]
+    valid_flat_weights = flat_weights[valid_mask]
 
     if valid_token_ids.numel() == 0:
         output.zero_()
@@ -350,7 +412,6 @@ def kernel(
     sorted_indices = torch.argsort(valid_local_expert_ids, stable=True)
     sorted_token_ids = valid_token_ids[sorted_indices]
     sorted_local_eids = valid_local_expert_ids[sorted_indices]
-    sorted_global_eids = valid_global_expert_ids[sorted_indices]
 
     # ── Part C: Build dispatch table ──
     unique_experts, expert_counts = torch.unique_consecutive(sorted_local_eids, return_counts=True)
@@ -362,7 +423,7 @@ def kernel(
     # ── Part D: Gather FP8 hidden_states + scales ──
     A_fp8_sorted = hidden_states[sorted_token_ids]
     A_scale_sorted = hidden_states_scale.T[sorted_token_ids]
-    w_sorted = weights[sorted_token_ids, sorted_global_eids]
+    w_sorted = valid_flat_weights[sorted_indices]
 
     # ── Part E: Grouped GEMM1 + SwiGLU + GEMM2 ──
     G1_buf = torch.empty((N_sorted, gemm1_out_size), dtype=torch.float32, device=device)
@@ -381,17 +442,17 @@ def kernel(
     # SwiGLU: FP32 -> FP32 (all rows, single launch)
     _swiglu(G1_buf, N_sorted, I, out=C_buf)
 
-    # GEMM2: FP32 A x FP8 B -> FP32 (all experts, single launch)
+    # GEMM2: FP32 A x FP8 B -> FP32, fused weight multiply (all experts, single launch)
     _grouped_fused_dequant_gemm(
         C_buf,
         gemm2_weights, gemm2_weights_scale,
         expert_offsets, unique_experts,
-        max_count, H, I,
+        w_sorted, max_count, H, I,
         out=O_buf,
     )
 
-    # ── Part F: Weighted scatter (single operation) ──
+    # ── Part F: Scatter (weight already applied in GEMM2 epilogue) ──
     result = torch.zeros((T, H), dtype=torch.float32, device=device)
-    result.index_add_(0, sorted_token_ids, O_buf * w_sorted.unsqueeze(1))
+    result.index_add_(0, sorted_token_ids, O_buf)
 
     output.copy_(result.to(torch.bfloat16))
