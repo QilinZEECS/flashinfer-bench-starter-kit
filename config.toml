@@ -4,5 +4,7 @@ definition = "moe_fp8_block_scale_ds_routing_topk8_ng8_kg4_e32_h7168_i2048"  # T
 author = "team-name"              # Team/author name
 
 [build]
-language = "triton"             # triton | cuda
-entry_point = "kernel.py::kernel"  # <file>::<function>
+language = "cuda"              # triton | cuda
+binding = "torch"             # torch | tvm-ffi
+entry_point = "kernel.cu::kernel"  # <file>::<function>
+cuda_arch = "sm_100a"         # Optional torch extension arch override for Modal validation
