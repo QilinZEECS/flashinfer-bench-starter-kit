@@ -18,6 +18,11 @@ except ImportError:
 
 import modal
 
+from scripts.torch_builder_flags import (
+    build_name_with_cuda_flags,
+    maybe_patch_torch_cpp_extension,
+)
+
 # Add project root to path for imports
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -27,9 +32,15 @@ app = modal.App("flashinfer-bench-ncu")
 trace_volume = modal.Volume.from_name("flashinfer-trace", create_if_missing=True)
 TRACE_SET_PATH = "/data"
 TRACE_SET_DATA_PATH = "/data/mlsys26-contest"
+CUTLASS_INCLUDE = "/opt/cutlass/include"
 
 image = (
-    modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04", add_python="3.12")
+    modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu22.04", add_python="3.12")
+    .add_local_python_source("scripts", copy=True)
+    .run_commands(
+        "apt-get update && apt-get install -y git && "
+        "git clone --depth 1 https://github.com/NVIDIA/cutlass.git /opt/cutlass"
+    )
     .pip_install("flashinfer-bench", "torch==2.8.0", "triton", "numpy")
     .run_commands(
         "python -c \"import pathlib, flashinfer_bench; "
@@ -38,6 +49,19 @@ image = (
         "assert old in s, f'missing pattern in {p}'; "
         "p.write_text(s.replace(old, 't = t.contiguous()')); "
         "print('patched', p)\""
+    )
+    .run_commands(
+        # Remove NVTX filter from NCU command so all kernels are profiled
+        'python -c "'
+        "import pathlib, flashinfer_bench;"
+        "p=pathlib.Path(flashinfer_bench.__file__).parent/'agents'/'ncu.py';"
+        "t=p.read_text();"
+        "t=t.replace('        \\x22--nvtx\\x22,\\n        \\x22--nvtx-include\\x22,\\n        \\x22flashinfer_bench_ncu_profile\\x22,\\n','');"
+        "p.write_text(t);"
+        "assert '--nvtx' not in p.read_text(), 'PATCH FAILED: --nvtx still present';"
+        "import subprocess; subprocess.run(['find', str(p.parent), '-name', '*.pyc', '-delete']);"
+        "print('patched ncu.py v3, verified --nvtx removed');"
+        '"'
     )
 )
 
@@ -111,11 +135,19 @@ def run_ncu_profile(
     workload_index: int = 0,
 ) -> dict:
     """Pack solution and run NCU profiling on one workload."""
+    os.environ["CPATH"] = (
+        CUTLASS_INCLUDE
+        if not os.environ.get("CPATH")
+        else f"{CUTLASS_INCLUDE}:{os.environ['CPATH']}"
+    )
     from flashinfer_bench import BuildSpec, TraceSet
     from flashinfer_bench.agents import flashinfer_bench_run_ncu, pack_solution_from_files
 
     solution_config = config_data["solution"]
     build_config = config_data["build"]
+    extra_cuda_cflags = maybe_patch_torch_cpp_extension(build_config)
+    if extra_cuda_cflags:
+        print(f"Injecting extra CUDA flags: {extra_cuda_cflags}")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         source_dir = Path(tmp_dir) / "solution_src"
@@ -126,15 +158,19 @@ def run_ncu_profile(
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_text(file_content)
 
-        spec = BuildSpec(
-            language=build_config["language"],
-            target_hardware=["cuda"],
-            entry_point=build_config["entry_point"],
-        )
+        spec_kwargs = {
+            "language": build_config["language"],
+            "target_hardware": ["cuda"],
+            "entry_point": build_config["entry_point"],
+        }
+        for key in ("dependencies", "binding", "destination_passing_style"):
+            if key in build_config:
+                spec_kwargs[key] = build_config[key]
+        spec = BuildSpec(**spec_kwargs)
         solution = pack_solution_from_files(
             path=str(source_dir),
             spec=spec,
-            name=solution_config["name"],
+            name=build_name_with_cuda_flags(solution_config["name"], build_config),
             definition=solution_config["definition"],
             author=solution_config["author"],
         )
