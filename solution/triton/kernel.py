@@ -4,11 +4,10 @@ Fused MoE Kernel for FlashInfer Competition.
 Track: moe_fp8_block_scale_ds_routing_topk8_ng8_kg4_e32_h7168_i2048
 Model: DeepSeek-V3/R1
 
-V009: Fused weight epilogue + fused routing.
-- Grouped GEMM with 3D grid (experts x M_tiles x N_tiles)
-- Weight multiply fused into GEMM2 store epilogue (eliminates temp + kernel)
-- Routing fused into single Triton kernel (replaces ~10 PyTorch ops)
-- Sparse routing output [T, TOP_K] eliminates dense [T, E_GLOBAL] weight matrix
+V012: Fused dispatch kernel — replaces ~15 PyTorch dispatch ops with single Triton kernel.
+- Histogram + prefix-sum + scatter replaces nonzero, argsort, unique_consecutive
+- Eliminates 7 DtoH syncs (item/nonzero) → single meta.tolist()
+- Routing + GEMM architecture unchanged from V009
 """
 
 import torch
@@ -272,6 +271,69 @@ def _swiglu_kernel(
         tl.store(out_ptr + row * I + cols, result, mask=mask)
 
 
+@triton.jit
+def _dispatch_kernel(
+    topk_idx_ptr, topk_weights_ptr,
+    local_start,
+    sorted_token_ids_ptr, sorted_weights_ptr,
+    expert_offsets_ptr,
+    meta_ptr,
+    TOTAL,
+    TOP_K: tl.constexpr,
+    E_LOCAL: tl.constexpr,
+):
+    """Fused dispatch: histogram + prefix-sum + scatter in one kernel.
+
+    Dense layout: expert_offsets[E_LOCAL+1] covers all 32 experts.
+    GEMM kernels early-exit for empty experts (count=0).
+    Grid: (1,). Single program processes all T*TOP_K entries.
+    """
+    offs_e = tl.arange(0, E_LOCAL)
+
+    # Step 1: Histogram — count tokens per local expert
+    counts = tl.zeros((E_LOCAL,), dtype=tl.int32)
+    for i in range(TOTAL):
+        eid = tl.load(topk_idx_ptr + i).to(tl.int32)
+        local_eid = eid - local_start
+        valid = (local_eid >= 0) & (local_eid < E_LOCAL)
+        counts += tl.where((offs_e == local_eid) & valid, 1, 0)
+
+    # Step 2: Exclusive prefix sum → expert_offsets[0..E_LOCAL]
+    # offsets[e] = sum(counts[0..e-1])
+    offsets = tl.zeros((E_LOCAL,), dtype=tl.int32)
+    for e in tl.static_range(1, E_LOCAL):
+        # offsets[e] = sum of counts[0..e-1]
+        prev_sum = tl.sum(tl.where(offs_e < e, counts, 0))
+        offsets = tl.where(offs_e == e, prev_sum, offsets)
+    N_valid = tl.sum(counts)
+
+    # Store dense expert_offsets[E_LOCAL+1]
+    tl.store(expert_offsets_ptr + offs_e, offsets.to(tl.int64))
+    tl.store(expert_offsets_ptr + E_LOCAL, N_valid.to(tl.int64))
+
+    # Find max_count
+    max_count = tl.max(counts, axis=0)
+
+    # Store metadata: [max_count, N_valid]
+    tl.store(meta_ptr + 0, max_count.to(tl.int64))
+    tl.store(meta_ptr + 1, N_valid.to(tl.int64))
+
+    # Step 3: Scatter tokens to sorted positions
+    write_pos = offsets  # per-expert write cursor (mutable copy)
+    for i in range(TOTAL):
+        eid = tl.load(topk_idx_ptr + i).to(tl.int32)
+        local_eid = eid - local_start
+        valid = (local_eid >= 0) & (local_eid < E_LOCAL)
+        # Branchless scatter: compute pos, only store if valid
+        pos = tl.sum(tl.where(offs_e == local_eid, write_pos, 0))
+        token_id = i // TOP_K
+        if valid:
+            tl.store(sorted_token_ids_ptr + pos, token_id.to(tl.int64))
+            tl.store(sorted_weights_ptr + pos, tl.load(topk_weights_ptr + i))
+        # Update write cursor (branchless: only the matching expert increments)
+        write_pos += tl.where((offs_e == local_eid) & valid, 1, 0)
+
+
 # ── Helper functions ────────────────────────────────────────────────
 
 def _grouped_fp8_dual_dequant_gemm(A_fp8, A_scale, B_fp8, B_scale,
@@ -357,6 +419,76 @@ def _fused_routing(routing_logits, routing_bias, routed_scaling_factor):
     return topk_idx, topk_weights
 
 
+def _pytorch_dispatch(topk_idx, topk_weights, local_start, E_local, T, device):
+    """PyTorch-based dispatch for large T (V009 logic)."""
+    token_ids = torch.arange(T, device=device).unsqueeze(1).expand(T, TOP_K).reshape(-1)
+    expert_ids = topk_idx.reshape(-1)
+    flat_weights = topk_weights.reshape(-1)
+    local_expert_ids = expert_ids - local_start
+
+    valid_mask = (local_expert_ids >= 0) & (local_expert_ids < E_local)
+    valid_token_ids = token_ids[valid_mask]
+    valid_local_expert_ids = local_expert_ids[valid_mask]
+    valid_flat_weights = flat_weights[valid_mask]
+
+    if valid_token_ids.numel() == 0:
+        return None, None, None, None, 0, 0
+
+    sorted_indices = torch.argsort(valid_local_expert_ids, stable=True)
+    sorted_token_ids = valid_token_ids[sorted_indices]
+    sorted_local_eids = valid_local_expert_ids[sorted_indices]
+    w_sorted = valid_flat_weights[sorted_indices]
+
+    unique_experts, expert_counts = torch.unique_consecutive(sorted_local_eids, return_counts=True)
+    expert_offsets = torch.zeros(unique_experts.shape[0] + 1, dtype=torch.int64, device=device)
+    expert_offsets[1:] = expert_counts.cumsum(0)
+    N_sorted = sorted_token_ids.shape[0]
+    max_count = expert_counts.max().item()
+
+    return sorted_token_ids, w_sorted, expert_offsets, unique_experts, max_count, N_sorted
+
+
+def _fused_dispatch(topk_idx, topk_weights, local_start, E_local, T):
+    """Fused dispatch: single Triton kernel replaces ~15 PyTorch ops.
+
+    Dense layout: expert_offsets covers all E_local experts.
+    Returns sorted_token_ids, sorted_weights, expert_offsets, expert_ids,
+            max_count, N_valid.
+    """
+    device = topk_idx.device
+    total = T * TOP_K
+
+    sorted_token_ids = torch.empty(total, dtype=torch.int64, device=device)
+    sorted_weights = torch.empty(total, dtype=torch.float32, device=device)
+    expert_offsets = torch.empty(E_local + 1, dtype=torch.int64, device=device)
+    meta = torch.empty(2, dtype=torch.int64, device=device)
+
+    _dispatch_kernel[(1,)](
+        topk_idx.reshape(-1), topk_weights.reshape(-1),
+        local_start,
+        sorted_token_ids, sorted_weights,
+        expert_offsets,
+        meta,
+        total, TOP_K, E_local,
+        num_warps=1,
+    )
+
+    # Single DtoH sync for metadata (replaces ~7 syncs)
+    meta_cpu = meta.tolist()
+    max_count, N_valid = int(meta_cpu[0]), int(meta_cpu[1])
+
+    # Dense expert_ids = all local experts [0..E_local-1]
+    expert_ids = torch.arange(E_local, dtype=torch.int64, device=device)
+
+    return (
+        sorted_token_ids[:N_valid],
+        sorted_weights[:N_valid],
+        expert_offsets,
+        expert_ids,
+        max_count, N_valid,
+    )
+
+
 # ── Main entry point (DPS) ──────────────────────────────────────────
 
 def kernel(
@@ -372,12 +504,11 @@ def kernel(
     routed_scaling_factor,
     output,
 ):
-    """Fused MoE kernel: grouped GEMM + fused routing (V009).
+    """Fused MoE kernel: grouped GEMM + fused routing + fused dispatch (V012).
 
-    Key changes from V008:
-    1. Routing fused into single Triton kernel (was ~10 PyTorch CUDA ops)
-    2. Sparse routing output [T, TOP_K] eliminates dense [T, E_GLOBAL] allocation
-    3. Weight multiply fused into GEMM2 store epilogue
+    Key changes from V009:
+    1. Fused dispatch: histogram+prefix-sum+scatter replaces ~15 PyTorch ops
+    2. Single DtoH sync (meta.tolist()) replaces ~7 syncs
     """
     device = hidden_states.device
     T = routing_logits.shape[0]
@@ -394,43 +525,29 @@ def kernel(
         routing_logits, routing_bias, scaling,
     )
 
-    # ── Part B: Sorted dispatch ──
-    token_ids = torch.arange(T, device=device).unsqueeze(1).expand(T, TOP_K).reshape(-1)
-    expert_ids = topk_idx.reshape(-1)
-    flat_weights = topk_weights.reshape(-1)
-    local_expert_ids = expert_ids - local_start
+    # ── Part B+C: Dispatch — Triton for small T, PyTorch for large T ──
+    if T * TOP_K <= 2048:
+        # Fused Triton dispatch (eliminates ~15 PyTorch ops)
+        sorted_token_ids, w_sorted, expert_offsets, unique_experts, max_count, N_sorted = \
+            _fused_dispatch(topk_idx, topk_weights, local_start, E_local, T)
+    else:
+        # PyTorch dispatch (better for large T where GEMM dominates)
+        sorted_token_ids, w_sorted, expert_offsets, unique_experts, max_count, N_sorted = \
+            _pytorch_dispatch(topk_idx, topk_weights, local_start, E_local, T, device)
 
-    valid_mask = (local_expert_ids >= 0) & (local_expert_ids < E_local)
-    valid_token_ids = token_ids[valid_mask]
-    valid_local_expert_ids = local_expert_ids[valid_mask]
-    valid_flat_weights = flat_weights[valid_mask]
-
-    if valid_token_ids.numel() == 0:
+    if N_sorted == 0:
         output.zero_()
         return
-
-    sorted_indices = torch.argsort(valid_local_expert_ids, stable=True)
-    sorted_token_ids = valid_token_ids[sorted_indices]
-    sorted_local_eids = valid_local_expert_ids[sorted_indices]
-
-    # ── Part C: Build dispatch table ──
-    unique_experts, expert_counts = torch.unique_consecutive(sorted_local_eids, return_counts=True)
-    expert_offsets = torch.zeros(unique_experts.shape[0] + 1, dtype=torch.int64, device=device)
-    expert_offsets[1:] = expert_counts.cumsum(0)
-    N_sorted = sorted_token_ids.shape[0]
-    max_count = expert_counts.max().item()
 
     # ── Part D: Gather FP8 hidden_states + scales ──
     A_fp8_sorted = hidden_states[sorted_token_ids]
     A_scale_sorted = hidden_states_scale.T[sorted_token_ids]
-    w_sorted = valid_flat_weights[sorted_indices]
 
     # ── Part E: Grouped GEMM1 + SwiGLU + GEMM2 ──
     G1_buf = torch.empty((N_sorted, gemm1_out_size), dtype=torch.float32, device=device)
     C_buf = torch.empty((N_sorted, I), dtype=torch.float32, device=device)
     O_buf = torch.empty((N_sorted, H), dtype=torch.float32, device=device)
 
-    # GEMM1: FP8 A x FP8 B -> FP32 (all experts, single launch)
     _grouped_fp8_dual_dequant_gemm(
         A_fp8_sorted, A_scale_sorted,
         gemm1_weights, gemm1_weights_scale,
@@ -439,10 +556,8 @@ def kernel(
         out=G1_buf,
     )
 
-    # SwiGLU: FP32 -> FP32 (all rows, single launch)
     _swiglu(G1_buf, N_sorted, I, out=C_buf)
 
-    # GEMM2: FP32 A x FP8 B -> FP32, fused weight multiply (all experts, single launch)
     _grouped_fused_dequant_gemm(
         C_buf,
         gemm2_weights, gemm2_weights_scale,
@@ -451,7 +566,7 @@ def kernel(
         out=O_buf,
     )
 
-    # ── Part F: Scatter (weight already applied in GEMM2 epilogue) ──
+    # ── Part F: Scatter ──
     result = torch.zeros((T, H), dtype=torch.float32, device=device)
     result.index_add_(0, sorted_token_ids, O_buf)
 
