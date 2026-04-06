@@ -88,8 +88,9 @@ def _gemm1_kernel(
                          mask=n_valid[:, None] & k_valid[None, :],
                          other=0.0)
 
-        # B scale scalar for (n_block, k_block)
-        b_sc = tl.load(Bsc_base + pid_n * stride_bscN + k_blk * stride_bscK)
+        # B scale scalar for (n_scale_block, k_block)
+        n_sc_idx = pid_n * BLOCK_N // BLOCK_K
+        b_sc = tl.load(Bsc_base + n_sc_idx * stride_bscN + k_blk * stride_bscK)
 
         # FP8 tensor-core dot, accumulate in FP32, then apply block scales
         # raw_dot[m,n] = sum_k a_fp8[m,k] * b_fp8[n,k]  (FP8 tensor cores on B200)
@@ -221,7 +222,8 @@ def _gemm2_fused_kernel(
                          mask=n_valid[:, None] & k_valid[None, :],
                          other=0.0).to(tl.float16)
 
-        b_sc = tl.load(Bsc_base + pid_n * stride_bscN + k_blk * stride_bscK)
+        n_sc_idx = n_start // BLOCK_K
+        b_sc = tl.load(Bsc_base + n_sc_idx * stride_bscN + k_blk * stride_bscK)
 
         raw_dot = tl.dot(a_tile, tl.trans(b_tile), out_dtype=tl.float32)
         acc    += raw_dot * a_sc[:, None] * b_sc
@@ -271,6 +273,7 @@ def _run_gemm1(A, A_sc, B, B_sc, C, tile_expert, tile_row,
         B_sc.stride(0), B_sc.stride(1), B_sc.stride(2),
         C.stride(0), C.stride(1),
         BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_SC,
+        num_warps=4,
     )
 
 
@@ -294,6 +297,7 @@ def _run_gemm2_fused(A_fp16, A_sc, B, B_sc, Out,
         B_sc.stride(0), B_sc.stride(1), B_sc.stride(2),
         Out.stride(0), Out.stride(1),
         BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N, BLOCK_K=BLOCK_SC,
+        num_warps=4,
     )
 
 
