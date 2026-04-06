@@ -5,13 +5,12 @@ Strategy:
   - DeepSeek V3 routing in Python
   - Sort tokens by expert, build per-tile dispatch table
   - GEMM1: FP8 A (with block scale) × FP8 B (with block scale) → FP32, all tiles parallel
-  - SwiGLU elementwise (PyTorch)
-  - GEMM2: FP32 A → dynamic FP8 quant per tile × FP8 B (with block scale) → FP32, FP8 tensor cores
+  - Fused SwiGLU + FP8 quantization (Triton) — eliminates PyTorch intermediate ops
+  - GEMM2: FP8 A (with block scale) × FP8 B (with block scale) → FP32, FP8 tensor cores
   - Vectorized weighted index_add_ (no per-expert Python loop)
 """
 
 import torch
-import torch.nn.functional as F
 import triton
 import triton.language as tl
 
@@ -101,9 +100,62 @@ def _gemm1_kernel(
     tl.store(c_ptrs, acc, mask=m_valid[:, None] & n_valid[None, :])
 
 
-# ─── Triton GEMM2: pre-scaled FP16 A × FP8 B (with block scale) ──────────────
-# A is pre-normalized outside kernel (once per K-block per row), avoids redundant
-# per-row max reductions across all N tiles.
+# ─── Triton Fused SwiGLU + FP8 Quantization ─────────────────────────────────
+# Replaces: F.silu(gate) * up → reshape → abs → amax → clamp → div → to(fp16)
+# with a single kernel that outputs FP8 + block scales for GEMM2.
+
+@triton.jit
+def _swiglu_fp16_norm_kernel(
+    G1_ptr,                    # GEMM1 output: [tv, 2*I] FP32 (first I=up, last I=gate)
+    C_fp16_ptr,                # Output: [tv, I] FP16 (normalized)
+    C_sc_ptr,                  # Output: [tv, K_sc] FP32 block scales
+    tv, I: tl.constexpr,
+    stride_g1m, stride_g1k,
+    stride_cm, stride_ck,
+    stride_scm, stride_sck,
+    BLOCK_M: tl.constexpr,
+    BLOCK_SC: tl.constexpr,    # = 128, FP8 block-scale size
+):
+    pid = tl.program_id(0)
+    m_start = pid * BLOCK_M
+    m_offs = m_start + tl.arange(0, BLOCK_M)
+    m_valid = m_offs < tv
+
+    K_sc: tl.constexpr = I // BLOCK_SC
+    sc_offs = tl.arange(0, BLOCK_SC)
+
+    for kb in range(K_sc):
+        k_start = kb * BLOCK_SC
+        k_offs = k_start + sc_offs
+
+        # Load up[m, k] (first I columns) and gate[m, k] (last I columns)
+        up_ptrs   = G1_ptr + m_offs[:, None] * stride_g1m + k_offs[None, :] * stride_g1k
+        gate_ptrs = G1_ptr + m_offs[:, None] * stride_g1m + (k_offs[None, :] + I) * stride_g1k
+
+        up   = tl.load(up_ptrs,   mask=m_valid[:, None], other=0.0)
+        gate = tl.load(gate_ptrs, mask=m_valid[:, None], other=0.0)
+
+        # SwiGLU: silu(gate) * up
+        swiglu = (gate * tl.sigmoid(gate)) * up  # silu(x) = x * sigmoid(x)
+
+        # Per-row block-scale FP16 normalization (same as v010 PyTorch path)
+        scale = tl.max(tl.abs(swiglu), axis=1)    # [BLOCK_M]
+        scale = tl.where(scale < 1e-8, 1e-8, scale)
+
+        # Normalize and cast to FP16
+        swiglu_norm = swiglu / scale[:, None]
+        swiglu_fp16 = swiglu_norm.to(tl.float16)
+
+        # Store FP16 output
+        c_ptrs = C_fp16_ptr + m_offs[:, None] * stride_cm + k_offs[None, :] * stride_ck
+        tl.store(c_ptrs, swiglu_fp16, mask=m_valid[:, None])
+
+        # Store block scale
+        sc_ptrs = C_sc_ptr + m_offs * stride_scm + kb * stride_sck
+        tl.store(sc_ptrs, scale, mask=m_valid)
+
+
+# ─── Triton GEMM2: FP16 A (pre-normalized) × FP8 B (with block scale) ────────
 
 @triton.jit
 def _gemm2_kernel(
@@ -160,7 +212,7 @@ def _gemm2_kernel(
                          mask=m_valid[:, None] & k_valid[None, :],
                          other=0.0)
 
-        # A_sc [BLOCK_M]: per-row scale for this K-block (pre-computed outside kernel)
+        # A_sc [BLOCK_M]: per-row scale for this K-block
         asc_ptrs = Asc_base + m_offs * stride_ascm + k_blk
         a_sc = tl.load(asc_ptrs, mask=m_valid, other=1.0)
 
@@ -217,7 +269,7 @@ def _run_gemm1(A, A_sc, B, B_sc, C, tile_expert, tile_row,
 
 def _run_gemm2(A_fp16, A_sc, B, B_sc, C, tile_expert, tile_row,
                exp_off, exp_cnt, exp_eid, BLOCK_M=64, BLOCK_N=128):
-    """A_fp16: [tv, K] FP16 (pre-normalized); A_sc: [tv, K_sc] FP32 (per-row-kblock scales)."""
+    """A_fp16: [tv, K] FP16 (pre-normalized); A_sc: [tv, K_sc] FP32."""
     tv, K = A_fp16.shape
     N = B.shape[1]
     K_sc = A_sc.shape[1]
@@ -351,18 +403,23 @@ def kernel(
         BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N,
     )
 
-    # ── SwiGLU: first I=up, last I=gate ──────────────────────────────────────
-    c_out = F.silu(g1_out[:, I:]) * g1_out[:, :I]   # [tv, I] FP32
+    # ── Fused SwiGLU + FP16 Normalization via Triton ────────────────────────────
+    # Replaces: F.silu(gate)*up → reshape → abs → amax → clamp → div → to(fp16)
+    K2_sc = I // BLOCK_SC   # = 16
+    c_fp16 = torch.empty(tv, I, dtype=torch.float16, device=device)
+    c_sc   = torch.empty(tv, K2_sc, dtype=torch.float32, device=device)
 
-    # ── GEMM2 via Triton ──────────────────────────────────────────────────────
-    # c_out [tv, I] @ W2[E, H, I].T → [tv, H]
-    # Pre-compute per-row-kblock FP16 normalization of c_out so the kernel
-    # can load pre-scaled FP16 A without redundant reductions across N tiles.
-    K2_sc = I // BLOCK_SC   # = 16  (number of K-blocks in GEMM2)
-    c_blk = c_out.reshape(tv, K2_sc, BLOCK_SC)          # [tv, 16, 128] FP32
-    c_sc  = c_blk.abs().amax(dim=2).clamp(min=1e-8)     # [tv, 16] FP32
-    c_fp16 = (c_blk / c_sc.unsqueeze(-1)).reshape(tv, I).to(torch.float16).contiguous()
+    swiglu_grid = (triton.cdiv(tv, BLOCK_M),)
+    _swiglu_fp16_norm_kernel[swiglu_grid](
+        g1_out, c_fp16, c_sc,
+        tv, I,
+        g1_out.stride(0), g1_out.stride(1),
+        c_fp16.stride(0), c_fp16.stride(1),
+        c_sc.stride(0), c_sc.stride(1),
+        BLOCK_M=BLOCK_M, BLOCK_SC=BLOCK_SC,
+    )
 
+    # ── GEMM2 via Triton (FP16×FP8 tensor cores) ────────────────────────────
     tile_exp2, tile_row2 = _build_tile_map(cnt_list, BLOCK_M, device)
 
     o_out = torch.empty(tv, H, dtype=torch.float32, device=device)
