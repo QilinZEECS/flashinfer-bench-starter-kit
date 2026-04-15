@@ -255,25 +255,36 @@ def _routing_kernel(
 
 
 @triton.jit
-def _swiglu_kernel(
-    input_ptr, out_ptr,
-    N, I: tl.constexpr, BLOCK_SIZE: tl.constexpr,
+def _swiglu_fp16_norm_kernel(
+    input_ptr,
+    out_fp16_ptr, out_scale_ptr,
+    N, I: tl.constexpr, BLOCK_SC: tl.constexpr,
 ):
-    """SwiGLU: silu(gate) * up. FP32 in, FP32 out."""
+    """Fused SwiGLU + FP16 per-block normalization.
+
+    Input:  [N, 2*I] FP32 (first I=up, last I=gate)
+    Output: [N, I] FP16 (normalized per 128-block) + [N, I//128] FP32 scales
+    Grid: (N,) — one program per row.
+    """
     row = tl.program_id(0)
-    col_offsets = tl.arange(0, BLOCK_SIZE)
+    NUM_BLOCKS: tl.constexpr = I // BLOCK_SC
+    sc_offsets = tl.arange(0, BLOCK_SC)
 
-    for block_idx in tl.static_range((I + BLOCK_SIZE - 1) // BLOCK_SIZE):
-        cols = block_idx * BLOCK_SIZE + col_offsets
-        mask = cols < I
+    for kb in tl.static_range(NUM_BLOCKS):
+        cols = kb * BLOCK_SC + sc_offsets
 
-        up = tl.load(input_ptr + row * 2 * I + cols, mask=mask, other=0.0)
-        gate = tl.load(input_ptr + row * 2 * I + I + cols, mask=mask, other=0.0)
+        up = tl.load(input_ptr + row * 2 * I + cols)
+        gate = tl.load(input_ptr + row * 2 * I + I + cols)
 
-        silu_gate = gate * tl.sigmoid(gate)
-        result = silu_gate * up
+        swiglu = (gate * tl.sigmoid(gate)) * up
 
-        tl.store(out_ptr + row * I + cols, result, mask=mask)
+        # Per-block scale + FP16 normalization
+        amax = tl.max(tl.abs(swiglu), axis=0)
+        scale = tl.where(amax < 1e-8, 1e-8, amax)
+        normed = (swiglu / scale).to(tl.float16)
+
+        tl.store(out_fp16_ptr + row * I + cols, normed)
+        tl.store(out_scale_ptr + row * NUM_BLOCKS + kb, scale)
 
 
 @triton.jit
@@ -388,12 +399,13 @@ def _grouped_fp16_gemm2(A_fp16, A_scale, B_fp8, B_scale,
     )
 
 
-def _swiglu(gemm1_out, N, I, out=None):
-    """SwiGLU on FP32 input -> FP32 output [N, I]."""
-    result = out if out is not None else torch.empty((N, I), dtype=torch.float32, device=gemm1_out.device)
-    block_size = min(BLOCK, I)
-    _swiglu_kernel[(N,)](gemm1_out, result, N, I, block_size, num_warps=4)
-    return result
+def _swiglu_fp16(gemm1_out, N, I, device):
+    """Fused SwiGLU + FP16 normalization. Returns (fp16_out, scales)."""
+    K2_sc = I // BLOCK
+    out_fp16 = torch.empty((N, I), dtype=torch.float16, device=device)
+    out_scale = torch.empty((N, K2_sc), dtype=torch.float32, device=device)
+    _swiglu_fp16_norm_kernel[(N,)](gemm1_out, out_fp16, out_scale, N, I, BLOCK, num_warps=4)
+    return out_fp16, out_scale
 
 
 def _fused_routing(routing_logits, routing_bias, routed_scaling_factor):
@@ -548,9 +560,8 @@ def kernel(
     A_fp8_sorted = hidden_states[sorted_token_ids]
     A_scale_sorted = hidden_states_scale.T[sorted_token_ids]
 
-    # ── Part E: Grouped GEMM1 + SwiGLU + FP8 Quant + GEMM2 ──
+    # ── Part E: Grouped GEMM1 + Fused SwiGLU+FP16Norm + GEMM2 ──
     G1_buf = torch.empty((N_sorted, gemm1_out_size), dtype=torch.float32, device=device)
-    C_buf = torch.empty((N_sorted, I), dtype=torch.float32, device=device)
     O_buf = torch.empty((N_sorted, H), dtype=torch.float32, device=device)
 
     _grouped_fp8_dual_dequant_gemm(
@@ -561,13 +572,7 @@ def kernel(
         out=G1_buf,
     )
 
-    _swiglu(G1_buf, N_sorted, I, out=C_buf)
-
-    # ── FP16 pre-normalization of SwiGLU output for GEMM2 ──
-    K2_sc = I // BLOCK  # = 2048 // 128 = 16
-    c_blk = C_buf.reshape(N_sorted, K2_sc, BLOCK)
-    c_scale = c_blk.abs().amax(dim=2).clamp(min=1e-8)   # [N_sorted, 16]
-    C_fp16 = (c_blk / c_scale.unsqueeze(-1)).reshape(N_sorted, I).to(torch.float16).contiguous()
+    C_fp16, c_scale = _swiglu_fp16(G1_buf, N_sorted, I, device)
 
     _grouped_fp16_gemm2(
         C_fp16, c_scale,
