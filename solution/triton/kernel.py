@@ -107,8 +107,8 @@ def _grouped_fp8_dual_dequant_gemm_kernel(
 
 @triton.autotune(configs=_gemm_configs, key=['N', 'K'])
 @triton.jit
-def _grouped_fused_dequant_gemm_kernel(
-    A_ptr,
+def _grouped_fp16_fp8_gemm2_kernel(
+    A_ptr, A_scale_ptr,
     B_ptr, B_scale_ptr,
     C_ptr,
     expert_offsets_ptr, expert_ids_ptr,
@@ -118,10 +118,10 @@ def _grouped_fused_dequant_gemm_kernel(
     stride_cm,
     BLOCK_M: tl.constexpr,
 ):
-    """Grouped GEMM2: C = A(f32) @ B(fp8).T with B block-scale dequant.
+    """Grouped GEMM2: C = A(fp16, pre-normalized) @ B(fp8).T with dual block-scale.
 
-    3D grid: (num_experts, max_m_tiles, N // 128).
-    TF32 tensor cores, FP32 accumulator.
+    A is FP16 pre-normalized per 128-block, A_scale has the magnitude.
+    B is FP8 with block scale. FP16 tensor cores (2x TF32 throughput).
     Fuses per-row weight multiply into store epilogue.
     """
     BLOCK_N: tl.constexpr = 128
@@ -146,7 +146,7 @@ def _grouped_fused_dequant_gemm_kernel(
     mask_m = local_offs_m < count
     offs_k = tl.arange(0, BLOCK_K)
 
-    # A pointers: FP32 [BLOCK_M, BLOCK_K]
+    # A pointers: FP16 [BLOCK_M, BLOCK_K] (pre-normalized)
     a_ptrs = A_ptr + offs_m[:, None] * stride_am + offs_k[None, :]
 
     # B^T pointers for this expert: FP8 [BLOCK_K, BLOCK_N]
@@ -160,15 +160,20 @@ def _grouped_fused_dequant_gemm_kernel(
     acc = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)
 
     for k_step in tl.static_range(NUM_K_BLOCKS):
-        a = tl.load(a_ptrs, mask=mask_m[:, None], other=0.0)
+        a_fp16 = tl.load(a_ptrs, mask=mask_m[:, None], other=0.0)
 
-        # Load B as FP8, dequant to FP32
+        # Load B as FP8 → cast to FP16 for FP16 tensor cores
         bt_fp8 = tl.load(bt_ptrs)
-        scale = tl.load(bscale_base + pid_n * NUM_K_BLOCKS + k_step)
-        bt_f32 = bt_fp8.to(tl.float32) * scale
+        bt_fp16 = bt_fp8.to(tl.float16)
 
-        # TF32 dot -> FP32 accumulator
-        acc += tl.dot(a, bt_f32)
+        # FP16 x FP16 dot -> FP32
+        raw = tl.dot(a_fp16, bt_fp16)
+
+        # Dual scale: A_scale[row, k_block] * B_scale[n_block, k_block]
+        scale_a = tl.load(A_scale_ptr + offs_m * NUM_K_BLOCKS + k_step,
+                          mask=mask_m, other=0.0)
+        scale_b = tl.load(bscale_base + pid_n * NUM_K_BLOCKS + k_step)
+        acc += raw * scale_a[:, None] * scale_b
 
         a_ptrs += BLOCK_K
         bt_ptrs += BLOCK_K
@@ -359,24 +364,24 @@ def _grouped_fp8_dual_dequant_gemm(A_fp8, A_scale, B_fp8, B_scale,
     )
 
 
-def _grouped_fused_dequant_gemm(A, B_fp8, B_scale,
-                                 expert_offsets, expert_ids,
-                                 weights, max_count, N, K, out):
-    """Grouped GEMM2: all experts in single launch, with fused weight multiply."""
+def _grouped_fp16_gemm2(A_fp16, A_scale, B_fp8, B_scale,
+                        expert_offsets, expert_ids,
+                        weights, max_count, N, K, out):
+    """Grouped GEMM2 with FP16×FP8 tensor cores + fused weight multiply."""
     num_experts = expert_ids.shape[0]
     grid = lambda META: (
         num_experts,
         triton.cdiv(max_count, META['BLOCK_M']),
         N // BLOCK,
     )
-    _grouped_fused_dequant_gemm_kernel[grid](
-        A,
+    _grouped_fp16_fp8_gemm2_kernel[grid](
+        A_fp16, A_scale,
         B_fp8, B_scale,
         out,
         expert_offsets, expert_ids,
         weights,
         N, K,
-        A.stride(0),
+        A_fp16.stride(0),
         B_fp8.stride(0), B_fp8.stride(1),
         B_scale.stride(0),
         out.stride(0),
@@ -543,7 +548,7 @@ def kernel(
     A_fp8_sorted = hidden_states[sorted_token_ids]
     A_scale_sorted = hidden_states_scale.T[sorted_token_ids]
 
-    # ── Part E: Grouped GEMM1 + SwiGLU + GEMM2 ──
+    # ── Part E: Grouped GEMM1 + SwiGLU + FP8 Quant + GEMM2 ──
     G1_buf = torch.empty((N_sorted, gemm1_out_size), dtype=torch.float32, device=device)
     C_buf = torch.empty((N_sorted, I), dtype=torch.float32, device=device)
     O_buf = torch.empty((N_sorted, H), dtype=torch.float32, device=device)
@@ -558,8 +563,14 @@ def kernel(
 
     _swiglu(G1_buf, N_sorted, I, out=C_buf)
 
-    _grouped_fused_dequant_gemm(
-        C_buf,
+    # ── FP16 pre-normalization of SwiGLU output for GEMM2 ──
+    K2_sc = I // BLOCK  # = 2048 // 128 = 16
+    c_blk = C_buf.reshape(N_sorted, K2_sc, BLOCK)
+    c_scale = c_blk.abs().amax(dim=2).clamp(min=1e-8)   # [N_sorted, 16]
+    C_fp16 = (c_blk / c_scale.unsqueeze(-1)).reshape(N_sorted, I).to(torch.float16).contiguous()
+
+    _grouped_fp16_gemm2(
+        C_fp16, c_scale,
         gemm2_weights, gemm2_weights_scale,
         expert_offsets, unique_experts,
         w_sorted, max_count, H, I,
